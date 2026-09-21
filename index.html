@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ドローンモニター</title>
-    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <h1>ドローンモニター</h1>
@@ -12,11 +12,10 @@
     <!-- 左側：送信パネル -->
     <div class="field">
         <div class="panel">
-            <h2>① 送信側 (スロットル)</h2>
-            
+            <h2>送信側 (スロットル)</h2>
             <div class="btn-group">
-                <button id="connectBtn">接続</button>
-                <button id="disconnectBtn" disabled>切断</button>
+                <button id="connectBtn" style="margin-top: 10px; padding: 5px;">接続</button>
+                <button id="disconnectBtn" style="margin-top: 10px; padding: 5px;" disabled>切断</button>
             </div>
             <div id="status">ステータス: 未接続</div>
 
@@ -51,20 +50,47 @@
                 <input type="range" id="slider3" min="48" max="2047" value="48">
                 <span id="val3" class="value-display">48 (0x030)</span>
             </div>
+
+            <div class="slider-container">
+                <label for="slider4">ピッチ:</label>
+                <input type="range" id="slider4" min="-30" max="30" value="0">
+                <span id="val4" class="value-display">0 (0x000)</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="slider5">ロール:</label>
+                <input type="range" id="slider5" min="-30" max="30" value="0">
+                <span id="val5" class="value-display">0 (0x000)</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="slider6">ヨー:</label>
+                <input type="range" id="slider6" min="-30" max="30" value="0">
+                <span id="val6" class="value-display">0 (0x000)</span>
+            </div>
+
             <div class="btn-group">
                 <button id="zeroBtn" style="margin-top: 10px; padding: 5px;">0を送信</button>
                 <button id="fortyEightBtn" style="margin-top: 10px; padding: 5px;">48を送信</button>
+                <button id="resetAttitudeBtn" style="margin-top: 10px; padding: 5px;">姿勢をリセット</button>
             </div>
         </div>
-
+        <div class="panel">
+            <h2>機体姿勢（グラフィカル表示）</h2>
+            <div class="canvas-wrapper">
+                <canvas id="attitudeCanvas" width="300" height="300" style="border: 1px solid #ccc; background: #222;"></canvas>
+            </div>
+        </div>
         <!-- 右側：受信パネル -->
         <div class="panel">
-            <h2>② 受信側 (Hex表示)</h2>
+            <h2>受信側 (Hex表示)</h2>
             <p style="font-size: 13px; color: #666;">マイコン（ESP32-S3）から復元されて返ってきた4つのデータをHexで表示します。</p>
             <textarea id="outputArea" readonly placeholder="データを受信するとHex表示されます..."></textarea>
             <button id="clearBtn" style="margin-top: 10px; padding: 5px;">ログをクリア</button>
+
         </div>
     </div>
-    <script src="index.js"></script>
+    <script src="serial-manager.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>

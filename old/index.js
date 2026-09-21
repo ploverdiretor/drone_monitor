@@ -9,15 +9,28 @@ let receivedBuffer = "";
 let lastSendTime = 0;
 let throttleTimeout = null;
 
+// DOM要素の取得
 const connectBtn = document.getElementById('connectBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
 const clearBtn = document.getElementById('clearBtn');
 const statusDiv = document.getElementById('status');
 const outputArea = document.getElementById('outputArea');
 
+// 追加：定義が漏れていたボタンの取得
+const zeroBtn = document.getElementById('zeroBtn');
+const fortyEightBtn = document.getElementById('fortyEightBtn');
+
 const sliderAll = document.getElementById('sliderAll');
 const valAllDisplay = document.getElementById('valAll');
 
+const sliderPitch = document.getElementById('slider4');
+const valPitchDisplay = document.getElementById('val4');
+
+const sliderRoll = document.getElementById('slider5');
+const valRollDisplay = document.getElementById('val5');
+
+const sliderYaw = document.getElementById('slider6');
+const valYawDisplay = document.getElementById('val6');
 const sliders = [
     document.getElementById('slider0'),
     document.getElementById('slider1'),
@@ -31,11 +44,23 @@ const valDisplays = [
     document.getElementById('val3')
 ];
 
-function updateSliderDisplay(displayElement, value) {
-    const hexStr = "0x" + parseInt(value).toString(16).toUpperCase().padStart(3, '0');
-    displayElement.innerText = `${value} (${hexStr})`;
-}
+// 初期データ (4モーター分)
+const sliderData =[48,48,48,48]; // 初期値を48に設定
 
+// 【修正】マイナス値にも対応した16進数表示関数
+function updateSliderDisplay(displayElement, value) {
+    const numValue = Math.trunc(Number(value));
+    let hexStr = "";
+
+    if (numValue < 0) {
+        // マイナスの場合は「-0x05」のような表記にする場合
+        hexStr = "-0x" + Math.abs(numValue).toString(16).toUpperCase().padStart(3, '0');
+    } else {
+        hexStr = "0x" + numValue.toString(16).toUpperCase().padStart(3, '0');
+    }
+    
+    displayElement.innerText = `${numValue} (${hexStr})`;
+}
 // 接続処理
 connectBtn.addEventListener('click', async () => {
     if (!('serial' in navigator)) {
@@ -62,7 +87,7 @@ connectBtn.addEventListener('click', async () => {
     }
 });
 
-// 完全に切断する処理 (TransformStreamのパイプライン競合対策を強化)
+// 切断処理
 disconnectBtn.addEventListener('click', async () => {
     if (!port) return;
 
@@ -72,29 +97,24 @@ disconnectBtn.addEventListener('click', async () => {
 
         keepReading = false;
 
-        // 1. 受信リーダー側をキャンセルしてストリームのブロックを解く
         if (activeReader) {
             await activeReader.cancel().catch(() => {});
         }
 
-        // 2. pipeTo経由のストリーム完全終了を待つ
         if (closedPromise) {
             await closedPromise.catch(() => {});
         }
 
-        // 3. 受信関数の終了ループ自体を完全に待つ
         if (readerPromise) {
             await readerPromise;
         }
 
-        // 4. 送信用ライターのロック解放と終了
         if (writer) {
             await writer.close().catch(() => {});
             writer.releaseLock();
             writer = null;
         }
 
-        // 5. ポートを安全に閉じる
         await port.close();
         port = null;
 
@@ -115,15 +135,14 @@ disconnectBtn.addEventListener('click', async () => {
     }
 });
 
-// 9バイト固定バイナリデータ送信
+// 9バイト固定バイナリデータ送信（sliderDataの最新値を送信）
 async function executeSend() {
     if (!writer) return;
 
     const packet = new Uint8Array(9);
     packet[0] = 0x7E; 
 
-    sliders.forEach((slider, i) => {
-        const val = parseInt(slider.value);
+    sliderData.forEach((val, i) => {
         packet[1 + i * 2] = (val >> 6) & 0x3F; 
         packet[2 + i * 2] = val & 0x3F;        
     });
@@ -152,60 +171,124 @@ function sendSliderDataThrottled() {
         }, remaining);
     }
 }
+// 全てのスライダーの画面表示（テキスト）を現在のつまみ位置に同期する関数
+function syncAllDisplays() {
+    updateSliderDisplay(valAllDisplay, sliderAll.value);
+    updateSliderDisplay(valPitchDisplay, sliderPitch.value);
+    updateSliderDisplay(valRollDisplay, sliderRoll.value);
+    updateSliderDisplay(valYawDisplay, sliderYaw.value);
+    sliders.forEach((slider, i) => {
+        updateSliderDisplay(valDisplays[i], slider.value);
+    });
+}
+// モーターデータを再計算して送信する共通処理
+function calculateAndSendMotorData() {
+    const pitchVal = Number(sliderPitch.value);
+    const rollVal = Number(sliderRoll.value);
+    const yawVal = Number(sliderYaw.value);
 
-// マイコンからのデータ受信関数
-/*
-async function readFromSerial() {
-    while (port && port.readable && keepReading) {
-        const textDecoder = new TextDecoderStream();
-        // pipeToの戻り値Promiseを保持することで、切断時にロック解放を待てるようにする
-        closedPromise = port.readable.pipeTo(textDecoder.writable);
-        activeReader = textDecoder.readable.getReader();
-
-        try {
-            while (keepReading) {
-                const { value, done } = await activeReader.read();
-                if (done) break;
-                if (value) {
-                    receivedBuffer += value;
-                    if (receivedBuffer.includes('\n')) {
-                        const lines = receivedBuffer.split('\n');
-                        receivedBuffer = lines.pop(); 
-
-                        for (const line of lines) {
-                            const cleanLine = line.trim();
-                            if (cleanLine.startsWith("RECV:")) {
-                                const rawValues = cleanLine.replace("RECV:", "").split(',');
-                                if (rawValues.length === 4) {
-                                    const hexLine = rawValues.map(v => {
-                                        const num = parseInt(v.trim());
-                                        return isNaN(num) ? "0x???" : "0x" + num.toString(16).toUpperCase().padStart(3, '0');
-                                    }).join(', ');
-
-                                    outputArea.value += `[復元データ] ${hexLine}\n`;
-                                    outputArea.scrollTop = outputArea.scrollHeight;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            if (keepReading) console.error('受信エラー:', error);
-        } finally {
-            if (activeReader) {
-                activeReader.releaseLock();
-                activeReader = null;
-            }
+    sliders.forEach((slider, index) => {
+        const baseVal = Number(slider.value);
+        let totalVal = 0;
+        switch (index) {
+            case 0: // モーター0
+                totalVal = baseVal - pitchVal + rollVal + yawVal;
+                break;
+            case 1: // モーター1
+                totalVal = baseVal + pitchVal + rollVal - yawVal;
+                break;
+            case 2: // モーター2
+                totalVal = baseVal + pitchVal - rollVal - yawVal;
+                break;
+            case 3: // モーター3
+                totalVal = baseVal - pitchVal - rollVal + yawVal;
+                break;
         }
+        // 下限・上限の安全ガード
+        if (totalVal < 48) {
+            totalVal = 48; 
+        } else if (totalVal > 2047) {
+            totalVal = 2047; // 送信データが11bit(0x7FF)を超えないよう上限もガード
+        }
+        sliderData[index] = totalVal;
+    //    updateSliderDisplay(valDisplays[index], baseVal); // 表示はスライダー単体の値
+    });
+    syncAllDisplays();
+    sendSliderDataThrottled();
+}
+
+// 一括制御スライダーイベント
+sliderAll.addEventListener('input', () => {
+    const targetValue = Number(sliderAll.value);
+    updateSliderDisplay(valAllDisplay, targetValue);
+    
+    if (targetValue >= 48) {
+        sliders.forEach((slider) => {
+            slider.value = targetValue;
+        });
+        // 一括変更後にピッチなどを加味して再計算・送信
+        calculateAndSendMotorData();
+    }
+});
+
+// 個別スライダーイベント
+sliders.forEach((slider) => {
+    slider.addEventListener('input', () => {
+        calculateAndSendMotorData();
+    });
+});
+
+// ピッチスライダーイベント
+sliderPitch.addEventListener('input', () => {
+    updateSliderDisplay(valPitchDisplay, sliderPitch.value);
+    calculateAndSendMotorData();
+});
+
+// ロールスライダーイベント
+sliderRoll.addEventListener('input', () => {
+    updateSliderDisplay(valRollDisplay, sliderRoll.value);
+    calculateAndSendMotorData();
+});
+
+// ヨースライダーイベント
+sliderYaw.addEventListener('input', () => {
+    updateSliderDisplay(valYawDisplay, sliderYaw.value);
+    calculateAndSendMotorData();
+});
+
+clearBtn.addEventListener('click', () => { outputArea.value = ''; });
+
+zeroBtn.addEventListener('click', () => {
+    numSend(0);
+});
+
+fortyEightBtn.addEventListener('click', () => {
+    numSend(48);
+});
+
+// 特定値の強制送信（9バイト固定）
+async function numSend(input) {
+    if (!writer) return;
+
+    const packet = new Uint8Array(9);
+    packet[0] = 0x7E; 
+
+    sliders.forEach((slider, i) => {
+        packet[1 + i * 2] = 0; 
+        packet[2 + i * 2] = input & 0x3F; // 安全のため下位6bitにマスク
+    });
+
+    try {
+        await writer.write(packet);
+    } catch (error) {
+        console.error('送信エラー:', error);
     }
 }
-*/
+
 // マイコンからのデータ受信関数
 async function readFromSerial() {
     while (port && port.readable && keepReading) {
         const textDecoder = new TextDecoderStream();
-        // pipeToの戻り値Promiseを保持することで、切断時にロック解放を待てるようにする
         closedPromise = port.readable.pipeTo(textDecoder.writable);
         activeReader = textDecoder.readable.getReader();
 
@@ -222,23 +305,19 @@ async function readFromSerial() {
                         for (const line of lines) {
                             const cleanLine = line.trim();
                             
-                            // 【既存機能】RECV: から始まる数値データの処理
                             if (cleanLine.startsWith("RECV:")) {
                                 const rawValues = cleanLine.replace("RECV:", "").split(',');
                                 if (rawValues.length === 4) {
                                     const hexLine = rawValues.map(v => {
-                                        const num = parseInt(v.trim());
-                                        return isNaN(num) ? "0x???" : "0x" + num.toString(16).toUpperCase().padStart(3, '0');
+                                        const num = Number(v.trim()); // parseIntから変更
+                                        return isNaN(num) ? "0x???" : "0x" + Math.trunc(num).toString(16).toUpperCase().padStart(3, '0');
                                     }).join(', ');
 
                                     outputArea.value += `[モータースロットル] ${hexLine}\n`;
                                     outputArea.scrollTop = outputArea.scrollHeight;
                                 }
                             }
-                            
-                            // 【追加機能】STR: から始まる文字列データの処理
                             else if (cleanLine.startsWith("STR:")) {
-                                // "STR:" の文字を取り除き、前後の余白をカットしてそのまま表示
                                 const strMessage = cleanLine.replace("STR:", "").trim();
                                 outputArea.value += `[文字列] ${strMessage}\n`;
                                 outputArea.scrollTop = outputArea.scrollHeight;
@@ -255,77 +334,5 @@ async function readFromSerial() {
                 activeReader = null;
             }
         }
-    }
-}
-
-// 一括制御スライダーイベント
-sliderAll.addEventListener('input', () => {
-    const targetValue = sliderAll.value;
-    updateSliderDisplay(valAllDisplay, targetValue);
-    if(targetValue >= 48) {
-        sliders.forEach((slider, index) => {
-            slider.value = targetValue;
-            updateSliderDisplay(valDisplays[index], targetValue);
-        });
-        sendSliderDataThrottled();
-    }
-});
-
-// 個別スライダーイベント
-sliders.forEach((slider, index) => {
-    slider.addEventListener('input', () => {
-        if(slider.value >= 48) {
-            updateSliderDisplay(valDisplays[index], slider.value);
-            sendSliderDataThrottled();
-        }
-    });
-});
-
-clearBtn.addEventListener('click', () => { outputArea.value = ''; });
-
-zeroBtn.addEventListener('click', () => {
-    zeroSend() 
-});
-
-fortyEightBtn.addEventListener('click', () => {
-    fortyEightSend();
-});
-
-// 9バイト固定バイナリデータ送信
-async function zeroSend() {
-    if (!writer) return;
-
-    const packet = new Uint8Array(9);
-    packet[0] = 0x7E; 
-
-    sliders.forEach((slider, i) => {
-        const val = parseInt(slider.value);
-        packet[1 + i * 2] = 0; 
-        packet[2 + i * 2] = 0;        
-    });
-
-    try {
-        await writer.write(packet);
-    } catch (error) {
-        console.error('送信エラー:', error);
-    }
-}
-// 9バイト固定バイナリデータ送信
-async function fortyEightSend() {
-    if (!writer) return;
-
-    const packet = new Uint8Array(9);
-    packet[0] = 0x7E; 
-
-    sliders.forEach((slider, i) => {
-        const val = parseInt(slider.value);
-        packet[1 + i * 2] = 0; 
-        packet[2 + i * 2] = 48;        
-    });
-
-    try {
-        await writer.write(packet);
-    } catch (error) {
-        console.error('送信エラー:', error);
     }
 }
