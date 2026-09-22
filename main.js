@@ -74,10 +74,10 @@ function calculateAndSendMotorData() {
                 break;
         }
         // 下限・上限の安全ガード
-        if (totalVal < 48) {
-            totalVal = 48; 
-        } else if (totalVal > 2047) {
-            totalVal = 2047; // 送信データが11bit(0x7FF)を超えないよう上限もガード
+        if (totalVal < 0) {
+            totalVal = 0; 
+        } else if (totalVal > 1000) {
+            totalVal = 1000; // 送信データが11bit(0x7FF)を超えないよう上限もガード
         }
         sliderData[index] = totalVal;
     });
@@ -102,7 +102,7 @@ sliderAll.addEventListener('input', () => {
     const targetValue = Number(sliderAll.value);
     updateSliderDisplay(valAllDisplay, targetValue);
     
-    if (targetValue >= 48) {
+    if (targetValue >= 0) {
         sliders.forEach((slider) => {
             slider.value = targetValue;
         });
