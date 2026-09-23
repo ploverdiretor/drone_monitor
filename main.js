@@ -36,6 +36,50 @@ const valDisplays = [
     document.getElementById('val2'),
     document.getElementById('val3')
 ];
+// 【追加】受信メーター用DOM要素の取得
+const motorMeters = [
+    document.getElementById('motorMeter0'),
+    document.getElementById('motorMeter1'),
+    document.getElementById('motorMeter2'),
+    document.getElementById('motorMeter3')
+];
+const motorVals = [
+    document.getElementById('motorVal0'),
+    document.getElementById('motorVal1'),
+    document.getElementById('motorVal2'),
+    document.getElementById('motorVal3')
+];
+
+// 【追加】受信データをレベルメーターに反映させるグローバル関数
+window.updateMotorMeters = function(rawValues) {
+    rawValues.forEach((v, i) => {
+        if (i > 3) return; // 4つ以上のデータは無視
+        const num = Number(v.trim());
+        if (isNaN(num)) return;
+
+        // 16進数文字列の作成
+        const hexStr = "0x" + Math.trunc(num).toString(16).toUpperCase().padStart(3, '0');
+        if (motorVals[i]) motorVals[i].innerText = hexStr;
+
+        // メーターのパーセンテージ計算 (最大値を1000として安全にガード)
+        let percent = (num / 1000) * 100;
+        if (percent < 0) percent = 0;
+        if (percent > 100) percent = 100;
+
+        if (motorMeters[i]) {
+            motorMeters[i].style.width = `${percent}%`;
+            
+            // スロットル量に応じて色を変化させる（お好みで）
+            if (percent > 85) {
+                motorMeters[i].style.backgroundColor = 'var(--danger-color)'; // 高負荷は赤
+                motorMeters[i].style.boxShadow = '0 0 8px var(--danger-color)';
+            } else {
+                motorMeters[i].style.backgroundColor = 'var(--accent-color)'; // 通常は緑
+                motorMeters[i].style.boxShadow = '0 0 8px var(--accent-color)';
+            }
+        }
+    });
+}
 
 // 全てのスライダーの画面表示（テキスト）を現在のつまみ位置に同期する関数
 function syncAllDisplays() {
@@ -61,16 +105,16 @@ function calculateAndSendMotorData() {
         let totalVal = 0;
         switch (index) {
             case 0: // モーター0
-                totalVal = baseVal - pitchVal + rollVal + yawVal;
+                totalVal = baseVal - pitchVal - rollVal + yawVal;
                 break;
             case 1: // モーター1
-                totalVal = baseVal + pitchVal + rollVal - yawVal;
-                break;
-            case 2: // モーター2
                 totalVal = baseVal + pitchVal - rollVal - yawVal;
                 break;
+            case 2: // モーター2
+                totalVal = baseVal - pitchVal + rollVal - yawVal;
+                break;
             case 3: // モーター3
-                totalVal = baseVal - pitchVal - rollVal + yawVal;
+                totalVal = baseVal + pitchVal + rollVal + yawVal;
                 break;
         }
         // 下限・上限の安全ガード

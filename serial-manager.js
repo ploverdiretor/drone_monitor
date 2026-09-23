@@ -178,10 +178,29 @@ async function readFromSerial() {
 
                         for (const line of lines) {
                             const cleanLine = line.trim();
-                            
+                            /*
                             if (cleanLine.startsWith("RECV:")) {
                                 const rawValues = cleanLine.replace("RECV:", "").split(',');
                                 if (rawValues.length === 4) {
+                                    const hexLine = rawValues.map(v => {
+                                        const num = Number(v.trim());
+                                        return isNaN(num) ? "0x???" : "0x" + Math.trunc(num).toString(16).toUpperCase().padStart(3, '0');
+                                    }).join(', ');
+
+                                    if (outputArea) {
+                                        outputArea.value += `[モータースロットル] ${hexLine}\n`;
+                                        outputArea.scrollTop = outputArea.scrollHeight;
+                                    }
+                                }
+                            }*/
+                            if (cleanLine.startsWith("RECV:")) {
+                                const rawValues = cleanLine.replace("RECV:", "").split(',');
+                                if (rawValues.length === 4) {
+                                    // 【追加】中央パネルのレベルメーターに値をリアルタイム反映
+                                    if (typeof window.updateMotorMeters === 'function') {
+                                        window.updateMotorMeters(rawValues);
+                                    }
+
                                     const hexLine = rawValues.map(v => {
                                         const num = Number(v.trim());
                                         return isNaN(num) ? "0x???" : "0x" + Math.trunc(num).toString(16).toUpperCase().padStart(3, '0');

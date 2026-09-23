@@ -246,3 +246,64 @@ textarea {
     border-radius: 8px;
     box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
 }
+/* ==========================================
+   【追加】モーターレベルメーターのスタイル
+   ========================================== */
+.motor-monitor-container {
+    margin-top: 24px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px solid var(--panel-border);
+}
+
+.motor-monitor-container h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.motor-meter-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.motor-meter-row:last-child {
+    margin-bottom: 0;
+}
+
+.motor-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--text-color);
+    width: 24px;
+}
+
+.meter-bar-bg {
+    flex: 1;
+    height: 12px;
+    background-color: #0c0c0d;
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.meter-bar-fill {
+    height: 100%;
+    width: 0%; /* 初期値 */
+    background-color: var(--accent-color); /* サイバーグリーン */
+    box-shadow: 0 0 8px var(--accent-color);
+    transition: width 0.05s ease-out; /* 滑らかに動かす */
+}
+
+.motor-value {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    color: var(--accent-color);
+    width: 55px;
+    text-align: right;
+}

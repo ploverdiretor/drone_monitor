@@ -80,6 +80,30 @@
             <div class="canvas-wrapper">
                 <canvas id="attitudeCanvas" width="300" height="300" style="border: 1px solid #ccc; background: #222;"></canvas>
             </div>
+            <!-- 【追加】各モーターの受信レベルメーター -->
+            <div class="motor-monitor-container">
+                <h3>モーター受信ステータス</h3>
+                <div class="motor-meter-row">
+                    <span class="motor-label">M1:BL</span>
+                    <div class="meter-bar-bg"><div id="motorMeter0" class="meter-bar-fill"></div></div>
+                    <span id="motorVal0" class="motor-value">0x000</span>
+                </div>
+                <div class="motor-meter-row">
+                    <span class="motor-label">M2:FL</span>
+                    <div class="meter-bar-bg"><div id="motorMeter1" class="meter-bar-fill"></div></div>
+                    <span id="motorVal1" class="motor-value">0x000</span>
+                </div>
+                <div class="motor-meter-row">
+                    <span class="motor-label">M3:BR</span>
+                    <div class="meter-bar-bg"><div id="motorMeter2" class="meter-bar-fill"></div></div>
+                    <span id="motorVal2" class="motor-value">0x000</span>
+                </div>
+                <div class="motor-meter-row">
+                    <span class="motor-label">M4:FR</span>
+                    <div class="meter-bar-bg"><div id="motorMeter3" class="meter-bar-fill"></div></div>
+                    <span id="motorVal3" class="motor-value">0x000</span>
+                </div>
+            </div>
         </div>
         <!-- 右側：受信パネル -->
         <div class="panel">
