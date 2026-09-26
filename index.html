@@ -12,43 +12,22 @@
     <!-- 左側：送信パネル -->
     <div class="field">
         <div class="panel">
-            <h2>送信側 (スロットル)</h2>
-            <div class="btn-group">
-                <button id="connectBtn" style="margin-top: 10px; padding: 5px;">接続</button>
-                <button id="disconnectBtn" style="margin-top: 10px; padding: 5px;" disabled>切断</button>
+            <div class="panel-header-wrap">
+                <h2>送信側</h2>
+                <div id="status">未接続</div>
             </div>
-            <div id="status">ステータス: 未接続</div>
 
+            <div class="btn-group">
+                <button id="connectBtn">接続</button>
+                <button id="disconnectBtn" disabled>切断</button>
+            </div>
             <!-- 一括制御用スライダー -->
             <div class="slider-container all-control">
-                <label for="sliderAll" style="color: #0050b3;">モーター ALL:</label>
+            <!--    <label for="sliderAll" style="color: #0050b3;">スロットル:</label>-->
+                <label for="sliderAll" >スロットル:</label>
                 <input type="range" id="sliderAll" min="0" max="1000" value="0">
-                <span id="valAll" class="value-display" style="color: #0050b3;">0 (0x000)</span>
-            </div>
-
-            <!-- 個別スライダー 4本 -->
-            <div class="slider-container">
-                <label for="slider0">モーター 1:</label>
-                <input type="range" id="slider0" min="0" max="1000" value="0">
-                <span id="val0" class="value-display">0 (0x000)</span>
-            </div>
-
-            <div class="slider-container">
-                <label for="slider1">モーター 2:</label>
-                <input type="range" id="slider1" min="0" max="1000" value="0">
-                <span id="val1" class="value-display">0 (0x000)</span>
-            </div>
-
-            <div class="slider-container">
-                <label for="slider2">モーター 3:</label>
-                <input type="range" id="slider2" min="0" max="1000" value="0">
-                <span id="val2" class="value-display">0 (0x000)</span>
-            </div>
-
-            <div class="slider-container">
-                <label for="slider3">モーター 4:</label>
-                <input type="range" id="slider3" min="0" max="1000" value="0">
-                <span id="val3" class="value-display">0 (0x000)</span>
+            <!--    <span id="valAll" class="value-display" style="color: #0050b3;">0 (0x000)</span>-->
+                <span id="valAll" class="value-display" >0 (0x000)</span>
             </div>
 
             <div class="slider-container">
@@ -68,15 +47,48 @@
                 <input type="range" id="slider6" min="-30" max="30" value="0">
                 <span id="val6" class="value-display">0 (0x000)</span>
             </div>
+            <hr style="border: 1px solid #555;">
+            <!-- 個別スライダー 4本 -->
+            <div class="slider-containerM">
+                <label for="slider0">モーター 1:</label>
+                <input type="range" id="slider0" min="0" max="1000" value="0">
+                <span id="val0" class="value-display">0 (0x000)</span>
+            </div>
 
-            <div class="btn-group">
-                <button id="zeroBtn" style="margin-top: 10px; padding: 5px;">0を送信</button>
-                <button id="fortyEightBtn" style="margin-top: 10px; padding: 5px;">48を送信</button>
-                <button id="resetAttitudeBtn" style="margin-top: 10px; padding: 5px;">姿勢をリセット</button>
+            <div class="slider-containerM">
+                <label for="slider1">モーター 2:</label>
+                <input type="range" id="slider1" min="0" max="1000" value="0">
+                <span id="val1" class="value-display">0 (0x000)</span>
+            </div>
+
+            <div class="slider-containerM">
+                <label for="slider2">モーター 3:</label>
+                <input type="range" id="slider2" min="0" max="1000" value="0">
+                <span id="val2" class="value-display">0 (0x000)</span>
+            </div>
+
+            <div class="slider-containerM">
+                <label for="slider3">モーター 4:</label>
+                <input type="range" id="slider3" min="0" max="1000" value="0">
+                <span id="val3" class="value-display">0 (0x000)</span>
+            </div>
+
+            <div class="btn-group font-compact" style="margin-top: 16px;">
+                <button id="zeroBtn">0を送信</button>
+                <button id="resetAttitudeBtn">姿勢リセット</button>
+                <button id="calibrationBtn" class="btn-warning">校正開始</button>
+            </div>
+            <div class="btn-group font-compact" style="margin-top: 10px;">
+                <button id="togglePidBtn">PID表示/非表示</button>
+                <button class="dummy-btn" disabled>ダミー1</button>
+                <button class="dummy-btn" disabled>ダミー2</button>
             </div>
         </div>
         <div class="panel">
-            <h2>機体姿勢</h2>
+            <div class="panel-header-wrap">
+                <h2>機体姿勢</h2>
+            </div>
+            
             <div class="canvas-wrapper">
                 <canvas id="attitudeCanvas" width="300" height="300" style="border: 1px solid #ccc; background: #222;"></canvas>
             </div>
@@ -107,14 +119,66 @@
         </div>
         <!-- 右側：受信パネル -->
         <div class="panel">
-            <h2>受信側 (Hex表示)</h2>
-            <p style="font-size: 13px; color: #666;">マイコン（ESP32-S3）から復元されて返ってきた4つのデータをHexで表示します。</p>
+            <div class="panel-header-wrap">
+                <h2>受信側 (Hex表示)</h2>
+            </div>
+            <p style="font-size: 13px; color: #666;">マイコンから復元されて返ってきた4つのデータをHexで表示します。</p>
             <textarea id="outputArea" readonly placeholder="データを受信するとHex表示されます..."></textarea>
             <button id="clearBtn" style="margin-top: 10px; padding: 5px;">ログをクリア</button>
-
         </div>
+        <!-- 一番右側のパネル：PIDパラメータ設定 -->
+        <div id="pidPanel" class="panel" style="display: none;">
+            <div class="panel-header-wrap">
+                <h2>PID パラメータ設定 (カスケード制御)</h2>
+            </div>
+            <!-- 軸切り替えボタングループ -->
+            <div class="axis-tab-group">
+                <button id="btn_tab_pitch" class="tab-btn active" onclick="switchPidTab('pitch')">ピッチ (Pitch)</button>
+                <button id="btn_tab_roll" class="tab-btn" onclick="switchPidTab('roll')">ロール (Roll)</button>
+                <button id="btn_tab_yaw" class="tab-btn" onclick="switchPidTab('yaw')">ヨー (Yaw)</button>
+            </div>
+
+            <div class="pid-tuning-container">
+                <div class="pid-grid-header-shared">
+                    <div>パラメータ</div>
+                    <div>調整スライダー</div>
+                    <div>現在の値</div>
+                </div>
+
+                <!-- アウター P -->
+                <div class="pid-param-row-shared">
+                    <div class="param-label">アウター P</div>
+                    <div class="pid-cell-shared"><input type="range" id="shared_outer_p" min="0" max="10" step="0.1" value="1.0"></div>
+                    <div id="shared_val_op" class="pid-val-shared">1.00</div>
+                </div>
+
+                <!-- インナー P -->
+                <div class="pid-param-row-shared">
+                    <div class="param-label">インナー P</div>
+                    <div class="pid-cell-shared"><input type="range" id="shared_inner_p" min="0" max="10" step="0.1" value="1.0"></div>
+                    <div id="shared_val_ip" class="pid-val-shared">1.00</div>
+                </div>
+
+                <!-- インナー I -->
+                <div class="pid-param-row-shared">
+                    <div class="param-label">インナー I</div>
+                    <div class="pid-cell-shared"><input type="range" id="shared_inner_i" min="0" max="10" step="0.1" value="0.0"></div>
+                    <div id="shared_val_ii" class="pid-val-shared">0.00</div>
+                </div>
+
+                <!-- インナー D -->
+                <div class="pid-param-row-shared">
+                    <div class="param-label">インナー D</div>
+                    <div class="pid-cell-shared"><input type="range" id="shared_inner_d" min="0" max="2" step="0.01" value="0.0"></div>
+                    <div id="shared_val_id" class="pid-val-shared">0.00</div>
+                </div>
+            </div>
+            <button id="sendPidBtn" style="margin-top: 16px;">PIDパラメータを機体に送信</button>
+        </div>
+
+
     </div>
-    <script src="serial-manager.js"></script>
+    <script src="serial.js"></script>
     <script src="main.js"></script>
 </body>
 </html>

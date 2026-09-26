@@ -24,48 +24,71 @@ body {
 }
 
 /* ==========================================
-   全体のレイアウト構造
+   全体のレイアウト構造（4カラム最適化版）
    ========================================== */
 .field {
     display: flex;
-    gap: 24px;
-    max-width: 1600px; /* 3枚並ぶため、全体の最大幅を少し広げます */
+    gap: 20px;
+    max-width: 1800px; /* 4枚並ぶため、全体の最大幅を少し広げます */
     margin: 0 auto;
-    align-items: flex-start; /* これを追加することで、すべてのパネルの「上端」が綺麗に揃います */
+/*    align-items: flex-start; *//* すべてのパネルの上端を綺麗に揃える */
+    align-items: stretch;  /* すべてのパネルの上端を綺麗に揃える */
 }
 
 .panel {
-    /* flex: 1; を削除、またはコメントアウトします */
-    padding: 24px;
+    padding: 20px;
     border: 1px solid var(--panel-border);
     border-radius: 12px;
     background-color: var(--panel-bg);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.20);
     box-sizing: border-box;
-}
-/* 左（送信）と右（受信）のパネルを広く（比率を2に設定） */
-.field > .panel:nth-child(1),
-.field > .panel:nth-child(3) {
-    flex: 2; 
-    min-width: 400px; /* スライダーやログが窮屈にならないよう最小幅を確保 */
+    display: flex;
+    flex-direction: column;
 }
 
-/* 中央（Canvas）のパネルを狭く（比率を1に設定） */
+/* 1番目：送信側（スロットル） */
+.field > .panel:nth-child(1) {
+    flex: 1.8; 
+    min-width: 320px;
+}
+
+/* 2番目：中央（Canvas・姿勢） */
 .field > .panel:nth-child(2) {
-    flex: 1;
-    min-width: 340px; /* 300pxのCanvas+パディングが収まる最適な幅 */
-    max-width: 400px; /* 大きくなりすぎないように上限をロック */
+    flex: 1.5;
+    min-width: 320px;
+    max-width: 400px;
 }
 
-h2 {
-    margin-top: 0;
-    margin-bottom: 20px;
-    font-size: 1.25rem;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+/* 3番目：受信側（Hex表示ログ） */
+.field > .panel:nth-child(3) {
+    flex: 1.8;
+    min-width: 300px;
+}
+
+/* 4番目：PIDパラメータ設定（新設） */
+.field > .panel:nth-child(4) {
+    flex: 1.5;
+    min-width: 460px; /* 横並びのスライダーや値が窮屈に潰れないよう広めに確保 */
+    align-self: flex-start;
+}
+
+/* ==========================================
+   パネルヘッダー & ステータス表示の調整
+   ========================================== */
+.panel-header-wrap {
+    display: flex;
+    justify-content: space-between; /* タイトルを左、ステータスを右に */
+    align-items: center;
     border-bottom: 1px solid var(--panel-border);
+    margin-bottom: 20px;
     padding-bottom: 12px;
-    color: var(--text-color);
+}
+
+/* パネルタイトルの下線スタイルをラップ側に移したため、h2自体の線を消す */
+.panel-header-wrap h2 {
+    margin: 0;
+    border-bottom: none;
+    padding-bottom: 0;
 }
 
 h3 {
@@ -80,20 +103,14 @@ h3 {
    ステータス & 接続エリア
    ========================================== */
 #status {
-    margin-bottom: 20px;
+    margin-bottom: 0; /* 下部マージンをリセット */
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--text-muted);
-    font-weight: 500;
-    text-align: center;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 6px;
-    font-size: 14px;
-}
-
-.btn-group {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
+    border: 1px solid var(--panel-border);
 }
 
 /* ==========================================
@@ -101,22 +118,35 @@ h3 {
    ========================================== */
 .slider-container {
     display: grid;
-    grid-template-columns: 100px 1fr 140px; /* 横並び幅を完全に固定して綺麗に整列 */
+    /* 修正：ラベル幅を85pxにコンパクトにし、右側の数値表示幅を75pxに絞ることで、中央の1fr（スライダー）を最大限右へ引き伸ばします */
+    grid-template-columns: 85px 1fr 75px; 
     align-items: center;
-    gap: 16px;
+    gap: 12px; /* 少し隙間を詰めてスライダーの領域を確保 */
     margin-bottom: 12px;
     padding: 8px 12px;
     background: rgba(255, 255, 255, 0.02);
     border-radius: 6px;
+    border: 1px dashed var(--primary-color);
 }
-
+.slider-containerM {
+    display: grid;
+    /* 修正：ラベル幅を85pxにコンパクトにし、右側の数値表示幅を75pxに絞ることで、中央の1fr（スライダー）を最大限右へ引き伸ばします */
+    grid-template-columns: 85px 1fr 75px; 
+    align-items: center;
+    gap: 12px; /* 少し隙間を詰めてスライダーの領域を確保 */
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 6px;
+    
+}
 /* 一括制御のみ特別枠 */
-.slider-container.all-control {
-    background-color: rgba(0, 122, 255, 0.08);
+.slider-container.all-control {/*
+    background-color: rgba(0, 122, 255, 0.08);*/
     border: 1px dashed var(--primary-color);
     border-radius: 8px;
-    margin-bottom: 16px;
-    padding: 12px;
+ /*   margin-bottom: 16px;
+    padding: 12px;*/
 }
 
 label {
@@ -126,22 +156,72 @@ label {
 }
 
 .slider-container.all-control label {
-    color: var(--primary-hover);
+/*    color: var(--primary-hover);*/
+    color: var(--text-color);
 }
 
 input[type="range"] {
     width: 100%;
-    accent-color: var(--primary-color); /* スライダーのつまみの色変更 */
+    accent-color: var(--primary-color);
     cursor: pointer;
     margin: 0;
 }
 
+/* 修正：数値表示のスタイルを最適化 */
 .value-display {
     font-family: 'Courier New', Courier, monospace;
     font-size: 13px;
-    text-align: right;
+    text-align: right; /* テキストを右に寄せる */
     font-weight: bold;
     color: var(--accent-color);
+    white-space: nowrap; /* 枠が狭まっても「0 (0x000)」が途中で改行されないようにガード */
+}
+/* ==========================================
+   ボタン関係の最適化
+   ========================================== */
+.btn-group {
+    display: flex;
+    gap: 10px; /* ボタン同士の間隔を少しタイトに */
+    margin-bottom: 20px;
+}
+
+/* 下部ボタン群の文字が枠からはみ出さないよう、少しだけ文字を小さくするクラス */
+.font-compact button {
+    font-size: 13px;
+    padding: 10px 8px; /* 横のパディングを少し絞る */
+}
+/* 上下のボタングループをくっつけるための指定 */
+.btn-group.font-compact {
+    margin-bottom: 0px; /* 上段のボタングループの下余白をゼロに */
+}
+
+/* 下段のボタングループ（HTML側で style="margin-top: 10px;" があれば削除するか、CSS側で0に上書きします） */
+.btn-group.font-compact + .btn-group.font-compact {
+    margin-top: 2px !important; /* 上下の隙間を完全になくす */
+}
+/* 校正開始（キャリブレーション）ボタンの目立たない警告色スタイル */
+#calibrationBtn {
+    background-color: rgba(255, 159, 10, 0.08); /* 以前よりさらに控えめなオレンジ */
+    border: 1px solid rgba(255, 159, 10, 0.25);
+    color: rgba(255, 159, 10, 0.8);
+}
+
+#calibrationBtn:hover:not(:disabled) {
+    background-color: #ff9f0a;
+    color: #121214;
+    border-color: #ff9f0a;
+    box-shadow: 0 0 8px rgba(255, 159, 10, 0.3);
+}
+/* ダミーボタンの無効化状態の見た目を少し調整（お好みで） */
+.dummy-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+    border-style: dashed; /* ダミーと分かりやすく点線に */
+}
+
+/* トグルボタンの初期状態の微調整 */
+#togglePidBtn {
+    border-color: var(--panel-border);
 }
 
 /* ==========================================
@@ -213,7 +293,7 @@ button:disabled {
    ========================================== */
 textarea {
     width: 100%;
-    height: 200px;
+    height: 500px;
     font-family: 'Fira Code', 'Courier New', monospace;
     font-size: 13px;
     box-sizing: border-box;
@@ -305,5 +385,69 @@ textarea {
     font-size: 12px;
     color: var(--accent-color);
     width: 55px;
+    text-align: right;
+}
+/* ==========================================
+   PID共通スライダー & タブ選択スタイル
+   ========================================== */
+.axis-tab-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.tab-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+    background-color: #2c2c35;
+    border: 1px solid var(--panel-border);
+    color: var(--text-muted);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* 選択されている軸ボタンの強調デザイン */
+.tab-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 8px rgba(0, 122, 255, 0.4);
+}
+
+.pid-grid-header-shared, .pid-param-row-shared {
+    display: grid;
+    /* パラメータ名(85px) | スライダー(1fr) | 数値表示(60px) */
+    grid-template-columns: 85px 1fr 60px;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.pid-grid-header-shared {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 6px;
+    text-align: center;
+}
+.pid-grid-header-shared div:numerator-left { text-align: left; }
+.pid-grid-header-shared div:numerator-right { text-align: right; }
+
+.pid-param-row-shared:last-child {
+    margin-bottom: 0;
+}
+
+.pid-cell-shared input[type="range"] {
+    width: 100%;
+    margin: 0;
+}
+
+.pid-val-shared {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--accent-color);
     text-align: right;
 }

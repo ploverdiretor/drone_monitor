@@ -6,7 +6,6 @@ const statusDiv = document.getElementById('status');
 const outputArea = document.getElementById('outputArea');
 
 const zeroBtn = document.getElementById('zeroBtn');
-const fortyEightBtn = document.getElementById('fortyEightBtn');
 const resetAttitudeBtn = document.getElementById('resetAttitudeBtn');
 
 const sliderAll = document.getElementById('sliderAll');
@@ -23,6 +22,8 @@ const valYawDisplay = document.getElementById('val6');
 
 const canvas = document.getElementById('attitudeCanvas');
 const ctx = canvas.getContext('2d');
+
+const sendPidBtn = document.getElementById('sendPidBtn');
 
 const sliders = [
     document.getElementById('slider0'),
@@ -94,6 +95,17 @@ function syncAllDisplays() {
     drawAttitude();
 }
 
+// 例：UIのスライダー値を読み取って送信する場合
+function sendCurrentSliders() {
+    const throttleVal = Number(document.getElementById('sliderAll').value); // 全体スロットル
+    const pitchVal    = Number(sliderPitch.value);
+    const rollVal     = Number(sliderRoll.value);
+    const yawVal      = Number(sliderYaw.value);
+
+    // 20msスロットルなどのタイマー処理を挟んで呼び出すと安定します
+    sendFlightControlData(throttleVal, pitchVal, rollVal, yawVal);
+}
+
 // モーターデータを再計算して送信する共通処理
 function calculateAndSendMotorData() {
     const pitchVal = Number(sliderPitch.value);
@@ -129,6 +141,9 @@ function calculateAndSendMotorData() {
     sendSliderDataThrottled();
 }
 
+
+
+
 // --- イベントリスナーの登録 ---
 
 // 接続ボタン
@@ -150,7 +165,10 @@ sliderAll.addEventListener('input', () => {
         sliders.forEach((slider) => {
             slider.value = targetValue;
         });
-        calculateAndSendMotorData();
+    //    calculateAndSendMotorData();
+     //   sendCurrentSliders();
+        syncAllDisplays();
+        sendFlightDataThrottled();
     }
 });
 
@@ -164,19 +182,28 @@ sliders.forEach((slider) => {
 // ピッチスライダーイベント
 sliderPitch.addEventListener('input', () => {
     updateSliderDisplay(valPitchDisplay, sliderPitch.value);
-    calculateAndSendMotorData();
+    //calculateAndSendMotorData();
+    //sendCurrentSliders();
+    syncAllDisplays();
+    sendFlightDataThrottled();
 });
 
 // ロールスライダーイベント
 sliderRoll.addEventListener('input', () => {
     updateSliderDisplay(valRollDisplay, sliderRoll.value);
-    calculateAndSendMotorData();
+    //calculateAndSendMotorData();
+    //sendCurrentSliders();
+    syncAllDisplays();
+    sendFlightDataThrottled();
 });
 
 // ヨースライダーイベント
 sliderYaw.addEventListener('input', () => {
     updateSliderDisplay(valYawDisplay, sliderYaw.value);
-    calculateAndSendMotorData();
+    //calculateAndSendMotorData();
+    //sendCurrentSliders();
+    syncAllDisplays();
+    sendFlightDataThrottled();
 });
 
 // ログ消去ボタン
@@ -189,10 +216,6 @@ zeroBtn.addEventListener('click', () => {
     numSend(0);
 });
 
-// 48強制送信ボタン
-fortyEightBtn.addEventListener('click', () => {
-    numSend(48);
-});
 // 姿勢（ピッチ、ロール、ヨー）を0にするボタンイベント
 resetAttitudeBtn.addEventListener('click', () => {
     // 各スライダーの値を0に設定
@@ -201,7 +224,9 @@ resetAttitudeBtn.addEventListener('click', () => {
     sliderYaw.value = 0;
 
     // 計算とデータ送信、画面表示の更新を同時に実行
-    calculateAndSendMotorData();
+    //calculateAndSendMotorData();
+    syncAllDisplays();
+    sendFlightDataThrottled();
 });
 
 // 方位目盛り（コンパス）付きアティチュード・インジケーターの描画関数
@@ -404,3 +429,111 @@ function drawAttitude() {
 // 初回描画の実行
 drawAttitude();
 
+const calibrationBtn = document.getElementById('calibrationBtn');
+
+// キャリブレーションボタンのイベント
+calibrationBtn.addEventListener('click', () => {
+    if (confirm('機体を水平な場所に置きましたか？キャリブレーションを開始します。')) {
+        // 新設した1バイト送信関数で 0x7C を直接送信
+        if (typeof sendSingleCommand === 'function') {
+            sendSingleCommand(0x7C); 
+        } else {
+            console.error("sendSingleCommand関数が定義されていません。");
+        }
+    }
+});
+
+// ==========================================
+// 【新設】共通スライダー＆軸切り替えタブ制御
+// ==========================================
+
+// 現在選択されているPIDの軸管理 ('pitch', 'roll', 'yaw')
+let currentPidAxis = 'pitch';
+
+// 12個の数値をメモリ（オブジェクト）内で初期値として保持
+const pidDataMemory = {
+    pitch: { outer_p: 1.0, inner_p: 1.0, inner_i: 0.0, inner_d: 0.0 },
+    roll:  { outer_p: 1.0, inner_p: 1.0, inner_i: 0.0, inner_d: 0.0 },
+    yaw:   { outer_p: 1.0, inner_p: 1.0, inner_i: 0.0, inner_d: 0.0 }
+};
+
+// 共通UI操作子（4本のスライダー）の取得
+const sharedSliders = {
+    outer_p: document.getElementById('shared_outer_p'),
+    inner_p: document.getElementById('shared_inner_p'),
+    inner_i: document.getElementById('shared_inner_i'),
+    inner_d: document.getElementById('shared_inner_d')
+};
+
+// 共通UI数値表示要素の取得
+const sharedDisplays = {
+    outer_p: document.getElementById('shared_val_op'),
+    inner_p: document.getElementById('shared_val_ip'),
+    inner_i: document.getElementById('shared_val_ii'),
+    inner_d: document.getElementById('shared_val_id')
+};
+
+// 軸タブを切り替えるグローバル関数 (HTMLのonclickから呼ばれます)
+window.switchPidTab = function(axis) {
+    currentPidAxis = axis;
+
+    // タブボタンのアクティブ状態（見た目）を切り替え
+    ['pitch', 'roll', 'yaw'].forEach(a => {
+        const btn = document.getElementById(`btn_tab_${a}`);
+        if (btn) {
+            if (a === axis) btn.classList.add('active');
+            else btn.classList.remove('active');
+        }
+    });
+
+    // メモリから切り替えた軸の数値を読み込んで、4本のスライダー・数値を画面に同期
+    Object.keys(sharedSliders).forEach(param => {
+        const savedValue = pidDataMemory[axis][param];
+        if (sharedSliders[param]) sharedSliders[param].value = savedValue;
+        if (sharedDisplays[param]) sharedDisplays[param].innerText = Number(savedValue).toFixed(2);
+    });
+};
+
+// 4本のスライダーを動かしたとき、現在選択中の軸メモリへ即座に値を上書き保存する処理
+Object.keys(sharedSliders).forEach(param => {
+    const slider = sharedSliders[param];
+    if (slider) {
+        slider.addEventListener('input', () => {
+            const val = Number(slider.value);
+            // 現在選択されている軸のメモリデータを更新
+            pidDataMemory[currentPidAxis][param] = val;
+            // 画面の数値テキストを更新
+            if (sharedDisplays[param]) sharedDisplays[param].innerText = val.toFixed(2);
+        });
+    }
+});
+
+// 送信ボタンが押された時、12個の数値をまとめてシリアル送信関数へ渡す処理
+if (sendPidBtn) {
+    sendPidBtn.addEventListener('click', () => {
+        // メモリに保存されている現在の12個のPIDデータを送信関数に渡す
+        if (typeof sendPidData === 'function') {
+            sendPidData(pidDataMemory); 
+        } else {
+            console.error("sendPidData関数が定義されていません。");
+        }
+    });
+}
+// 追加したトグルボタンとPIDパネルのDOMを取得
+const togglePidBtn = document.getElementById('togglePidBtn');
+const pidPanel = document.getElementById('pidPanel');
+
+// 表示・非表示を切り替えるイベントリスナー
+if (togglePidBtn && pidPanel) {
+    togglePidBtn.addEventListener('click', () => {
+        if (pidPanel.style.display === 'none') {
+            // 非表示なら表示する (CSSでflex指定されている親要素に合わせるため空文字にするか 'block' にする)
+            pidPanel.style.display = ''; 
+            togglePidBtn.style.backgroundColor = 'var(--primary-color)'; // アクティブ時に色を変える（任意）
+        } else {
+            // 表示されているなら非表示にする
+            pidPanel.style.display = 'none';
+            togglePidBtn.style.backgroundColor = ''; // 色を元に戻す
+        }
+    });
+}
