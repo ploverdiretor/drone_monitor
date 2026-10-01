@@ -663,9 +663,9 @@ let currentPidAxis = 'pitch';
 
 // 12個の数値をメモリ（オブジェクト）内で初期値として保持
 const pidDataMemory = {
-    pitch: { outer_p: 1.0, inner_p: 1.0, inner_i: 0.0, inner_d: 0.0 },
-    roll:  { outer_p: 1.0, inner_p: 1.0, inner_i: 0.0, inner_d: 0.0 },
-    yaw:   { outer_p: 1.0, inner_p: 1.0, inner_i: 0.0, inner_d: 0.0 }
+    pitch: { outer_p: 0.0, inner_p: 0.0, inner_i: 0.0, inner_d: 0.0 },
+    roll:  { outer_p: 0.0, inner_p: 0.0, inner_i: 0.0, inner_d: 0.0 },
+    yaw:   { outer_p: 0.0, inner_p: 0.0, inner_i: 0.0, inner_d: 0.0 }
 };
 
 // 共通UI操作子（4本のスライダー）の取得
