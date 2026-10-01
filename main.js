@@ -92,7 +92,7 @@ function syncAllDisplays() {
         updateSliderDisplay(valDisplays[i], slider.value);
     });
     // 【追加】スライダー値が変わるたびにグラフィックを再描画
-    drawAttitude();
+    //drawAttitude();
 }
 
 // 例：UIのスライダー値を読み取って送信する場合
@@ -228,16 +228,15 @@ resetAttitudeBtn.addEventListener('click', () => {
     syncAllDisplays();
     sendFlightDataThrottled();
 });
-
+/*
 // 方位目盛り（コンパス）付きアティチュード・インジケーターの描画関数
-function drawAttitude() {
-    // 画面のクリア
+function drawAttitude(optPitch, optRoll, optYaw) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // スライダーの値を取得（度数法）
-    const pitchDeg = Number(sliderPitch.value);
-    const rollDeg = Number(sliderRoll.value);
-    const yawDeg = Number(sliderYaw.value);
+    // 引数（受信データ）が存在すればそれを使用し、無ければスライダーの値を読み取る
+    const pitchDeg = (optPitch !== undefined) ? optPitch : Number(sliderPitch.value);
+    const rollDeg  = (optRoll  !== undefined) ? optRoll  : Number(sliderRoll.value);
+    const yawDeg   = (optYaw   !== undefined) ? optYaw   : Number(sliderYaw.value);
 
     // ラジアンに変換
     const rollRad = rollDeg * Math.PI / 180;
@@ -425,10 +424,196 @@ function drawAttitude() {
     // X座標: canvas.width - 15px (右端), Y座標: 25px に変更して上端の隅へ配置
     ctx.fillText(`YAW:   ${yawDeg}°`, canvas.width - 15, 25);
 }
+*/
+// 方位目盛り（コンパス）付きアティチュード・インジケーターの描画関数
+function drawAttitude(pitchDeg, rollDeg, yawDeg) {
+    // 💡 万が一引数が空（初期化時など）の場合は0度に設定
+    if (pitchDeg === undefined) pitchDeg = 0;
+    if (rollDeg === undefined)  rollDeg = 0;
+    if (yawDeg === undefined)   yawDeg = 0;
+
+    // 画面のクリア
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // ラジアンに変換
+    const rollRad = rollDeg * Math.PI / 180;
+    const yawRad = yawDeg * Math.PI / 180;
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = 95;      
+    const compassRadius = 115; 
+
+    // ==========================================
+    // 1. 動く背景（空と大地）の描画
+    // ==========================================
+    ctx.save();
+    
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+    ctx.clip();
+
+    ctx.translate(cx, cy);
+    ctx.rotate(-rollRad); 
+    
+    const pitchOffset = pitchDeg * 1.5; 
+    ctx.translate(0, pitchOffset);
+
+    // 空（上半分）を描画
+    ctx.fillStyle = '#007aff';
+    ctx.fillRect(-radius * 2, -radius * 4, radius * 4, radius * 4);
+
+    // 大地（下半分）を描画
+    ctx.fillStyle = '#543d2b';
+    ctx.fillRect(-radius * 2, 0, radius * 4, radius * 4);
+
+    // 水平線
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-radius * 1.5, 0);
+    ctx.lineTo(radius * 1.5, 0);
+    ctx.stroke();
+
+    // ピッチ目盛り（ラダー）の描画
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 1.5;
+
+    const pitchLines = [-30, -20, -10, 10, 20, 30];
+    pitchLines.forEach(deg => {
+        const y = -deg * 1.5;
+        const width = deg % 20 === 0 ? 40 : 20;
+
+        ctx.beginPath();
+        ctx.moveTo(-width / 2, y);
+        ctx.lineTo(width / 2, y);
+        ctx.stroke();
+
+        ctx.fillText(Math.abs(deg).toString(), -width / 2 - 12, y);
+        ctx.fillText(Math.abs(deg).toString(), width / 2 + 12, y);
+    });
+
+    ctx.restore(); 
+
+    // ==========================================
+    // 2. 水平儀のベゼル（内枠）の描画
+    // ==========================================
+    ctx.strokeStyle = '#2d2d34';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+    ctx.stroke();
+
+    // ==========================================
+    // 3. 外周コンパス（方位目盛り）の描画
+    // ==========================================
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-yawRad); 
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.fillStyle = '#e3e3e6';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let angle = 0; angle < 360; angle += 30) {
+        const rad = (angle - 90) * Math.PI / 180; 
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        const startX = cos * radius;
+        const startY = sin * radius;
+        const endX = cos * (compassRadius - 5);
+        const endY = sin * (compassRadius - 5);
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.lineWidth = angle % 90 === 0 ? 2 : 1; 
+        ctx.stroke();
+
+        const textX = cos * (compassRadius + 8);
+        const textY = sin * (compassRadius + 8);
+
+        if (angle === 0) {
+            ctx.fillStyle = '#ff3b30'; 
+            ctx.fillText('0', textX, textY);
+        } else if (angle === 90) {
+            ctx.fillStyle = '#e3e3e6';
+            ctx.fillText('09', textX, textY);
+        } else if (angle === 180) {
+            ctx.fillStyle = '#e3e3e6';
+            ctx.fillText('18', textX, textY);
+        } else if (angle === 270) {
+            ctx.fillStyle = '#e3e3e6';
+            ctx.fillText('27', textX, textY);
+        } else {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.font = '9px monospace';
+            ctx.fillText((angle / 10).toString().padStart(2, '0'), textX, textY); 
+            ctx.font = 'bold 11px sans-serif'; 
+        }
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, compassRadius + 16, 0, 2 * Math.PI);
+    ctx.stroke();
+
+    // ==========================================
+    // 4. 固定ヘディングインジケーター
+    // ==========================================
+    ctx.fillStyle = '#ff3b30';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - compassRadius - 14);
+    ctx.lineTo(cx - 6, cy - compassRadius - 26);
+    ctx.lineTo(cx + 6, cy - compassRadius - 26);
+    ctx.closePath();
+    ctx.fill();
+
+    // ==========================================
+    // 5. 自機マーク
+    // ==========================================
+    ctx.strokeStyle = '#ffcc00';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(cx - 40, cy);
+    ctx.lineTo(cx - 15, cy);
+    ctx.lineTo(cx - 15, cy + 8);
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, 1.5, 0, 2 * Math.PI);
+    ctx.moveTo(cx + 40, cy);
+    ctx.lineTo(cx + 15, cy);
+    ctx.lineTo(cx + 15, cy + 8);
+    ctx.stroke();
+
+    // ==========================================
+    // 6. テキスト情報のオーバーレイ表示
+    // ==========================================
+    ctx.fillStyle = '#e3e3e6';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'left';
+    
+    ctx.fillText(`PITCH: ${pitchDeg >= 0 ? '+' : ''}${pitchDeg.toFixed(1)}°`, 15, 25);
+    ctx.fillText(`ROLL:  ${rollDeg >= 0 ? '+' : ''}${rollDeg.toFixed(1)}°`, 15, 40);
+    
+    ctx.textAlign = 'right';
+    ctx.fillText(`YAW:   ${yawDeg.toFixed(1)}°`, canvas.width - 15, 25);
+}
 
 // 初回描画の実行
-drawAttitude();
-
+//drawAttitude();
+drawAttitude(0, 0, 0);
 const calibrationBtn = document.getElementById('calibrationBtn');
 
 // キャリブレーションボタンのイベント

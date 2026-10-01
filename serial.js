@@ -187,56 +187,146 @@ async function numSend(input) {
         console.error('送信エラー:', error);
     }
 }
+// 【重要】メモリ負荷を減らすため、TextDecoderは関数の外で1度だけ生成して使い回す
+const globalDecoder = new TextDecoder("utf-8", { fatal: false });
 
-// マイコンからのデータ受信関数
+// マイコンからのデータ受信関数（ブラウザ負荷極小化・とぎれとぎれ解消版）
 async function readFromSerial() {
     const outputArea = document.getElementById('outputArea');
+    let binaryBuffer = new Uint8Array(0); // バイナリ解析用の受信用バッファ
+
     while (port && port.readable && keepReading) {
-        const textDecoder = new TextDecoderStream();
-        closedPromise = port.readable.pipeTo(textDecoder.writable);
-        activeReader = textDecoder.readable.getReader();
+        activeReader = port.readable.getReader();
 
         try {
             while (keepReading) {
                 const { value, done } = await activeReader.read();
                 if (done) break;
-                if (value) {
-                    receivedBuffer += value;
-                    if (receivedBuffer.includes('\n')) {
-                        const lines = receivedBuffer.split('\n');
-                        receivedBuffer = lines.pop(); 
+                if (!value) continue;
 
-                        for (const line of lines) {
-                            const cleanLine = line.trim();
-                            if (cleanLine.startsWith("RECV:")) {
-                                const rawValues = cleanLine.replace("RECV:", "").split(',');
-                                if (rawValues.length === 4) {
-                                    // 【追加】中央パネルのレベルメーターに値をリアルタイム反映
-                                    if (typeof window.updateMotorMeters === 'function') {
-                                        window.updateMotorMeters(rawValues);
-                                    }
+                // バッファの結合（高速化のため、バッファが大きくなりすぎたら制限をかける）
+                if (binaryBuffer.length > 4096) {
+                    binaryBuffer = new Uint8Array(0); // 溜まりすぎたバッファを強制クリア（ラグ防止）
+                }
+                
+                let newBuffer = new Uint8Array(binaryBuffer.length + value.length);
+                newBuffer.set(binaryBuffer);
+                newBuffer.set(value, binaryBuffer.length);
+                binaryBuffer = newBuffer;
 
-                                    const hexLine = rawValues.map(v => {
-                                        const num = Number(v.trim());
-                                        return isNaN(num) ? "0x???" : "0x" + Math.trunc(num).toString(16).toUpperCase().padStart(3, '0');
-                                    }).join(', ');
+                let i = 0;
+                while (i < binaryBuffer.length) {
+                    
+                    // 🟪 パターン1: 姿勢データパケット (0x7A) の検出
+                    if (binaryBuffer[i] === 0x7A) {
+                        if (i + 10 > binaryBuffer.length) {
+                            break; // データが揃うまで待つ
+                        }
 
-                                    if (outputArea) {
-                                        outputArea.value += `[モータースロットル] ${hexLine}\n`;
-                                        outputArea.scrollTop = outputArea.scrollHeight;
-                                    }
-                                }
+                        const packet = binaryBuffer.subarray(i, i + 10);
+                        i += 10;
+
+                        // 16bit整数への復元
+                        let rawAngles = new Int16Array(3);
+                        for (let axis = 0; axis < 3; axis++) {
+                            const upper4 = packet[1 + axis * 3] & 0x0F;
+                            const mid6   = packet[2 + axis * 3] & 0x3F;
+                            const lower6 = packet[3 + axis * 3] & 0x3F;
+
+                            let combined = (upper4 << 12) | (mid6 << 6) | lower6;
+                            if (combined & 0x8000) combined |= 0xFFFF0000; 
+                            rawAngles[axis] = combined;
+                        }
+
+                        // Canvasの描画（引数を渡してダイレクトに描画）
+                        if (typeof drawAttitude === 'function') {
+                            drawAttitude(rawAngles[1] / 100.0, rawAngles[2] / 100.0, rawAngles[0] / 100.0);
+                        }
+                        continue;
+                    }
+                    // 🟦 【新設】パターン3: モーターデータパケット (0x7E) のバイナリ検出
+                    if (binaryBuffer[i] === 0x7E) {
+                        // 9バイト揃うまで次回のデータ受信を待つ
+                        if (i + 9 > binaryBuffer.length) {
+                            break; 
+                        }
+
+                        // 9バイトのパケットを切り出し
+                        const packet = binaryBuffer.subarray(i, i + 9);
+                        i += 9; // 9バイト消費
+
+                        // 2バイトずつ結合して元の4つのモーター値(0〜1000)を復元
+                        let motorValues = [];
+                        for (let m = 0; m < 4; m++) {
+                            const val = (packet[1 + m * 2] << 8) | packet[2 + m * 2];
+                            motorValues.push(String(val)); // 既存のメーター関数に合わせるため文字列型にして格納
+                        }
+
+                        // 中央下のグリーンのレベルメーターへダイレクトに超高速反映！
+                        if (typeof window.updateMotorMeters === 'function') {
+                            window.updateMotorMeters(motorValues);
+                        }
+
+                        // 右側テキストエリアへ16進数ログを出力（文字列処理をここだけに限定して軽量化）
+                        if (outputArea) {
+                            const hexLine = motorValues.map(v => "0x" + Math.trunc(Number(v)).toString(16).toUpperCase().padStart(3, '0')).join(', ');
+                            outputArea.value += `[モーター出力] ${hexLine}\n`;
+                            
+                            if (outputArea.value.length > 5000) {
+                                outputArea.value = outputArea.value.substring(2500);
                             }
-                            else if (cleanLine.startsWith("STR:")) {
-                                const strMessage = cleanLine.replace("STR:", "").trim();
+                            outputArea.scrollTop = outputArea.scrollHeight;
+                        }
+                        continue;
+                    }
+                    // 🟩 パターン2: テキストログデータの検出（改行コード基準）
+                    let nextNewLine = binaryBuffer.indexOf(0x0A, i); // 0x0A = '\n'
+                    
+                    if (nextNewLine !== -1) {
+                        const lineBytes = binaryBuffer.subarray(i, nextNewLine);
+                        i = nextNewLine + 1;
+
+                        // 外で生成した globalDecoder を使うことでフリーズ（遅延）を防止
+                        const cleanLine = globalDecoder.decode(lineBytes).trim();
+                        
+                        // 文字列判定の高速化（startsWithを使用）
+                        if (cleanLine.startsWith("RECV:") || cleanLine.includes("RECV:")) {
+                            const startIdx = cleanLine.indexOf("RECV:");
+                            const rawValues = cleanLine.substring(startIdx).replace("RECV:", "").split(',');
+                            
+                            if (rawValues.length === 4) {
+                                if (typeof window.updateMotorMeters === 'function') {
+                                    window.updateMotorMeters(rawValues);
+                                }
+
+                                // ログエリアの更新（表示が追いつかない原因になるため、スクロール処理を軽量化）
                                 if (outputArea) {
-                                    outputArea.value += `[文字列] ${strMessage}\n`;
+                                    const hexLine = rawValues.map(v => "0x" + Math.trunc(Number(v)).toString(16).toUpperCase().padStart(3, '0')).join(', ');
+                                    outputArea.value += `[モーター] ${hexLine}\n`;
+                                    
+                                    // ログが長くなりすぎたら古いものを消す（ブラウザを重くさせない対策）
+                                    if (outputArea.value.length > 5000) {
+                                        outputArea.value = outputArea.value.substring(2500);
+                                    }
                                     outputArea.scrollTop = outputArea.scrollHeight;
                                 }
                             }
                         }
+                        else if (cleanLine.startsWith("STR:") || cleanLine.includes("STR:")) {
+                            const startIdx = cleanLine.indexOf("STR:");
+                            const strMessage = cleanLine.substring(startIdx).replace("STR:", "").trim();
+                            if (outputArea) {
+                                outputArea.value += `[文字列] ${strMessage}\n`;
+                                outputArea.scrollTop = outputArea.scrollHeight;
+                            }
+                        }
+                        continue;
                     }
+
+                    i++;
                 }
+
+                binaryBuffer = binaryBuffer.slice(i);
             }
         } catch (error) {
             if (keepReading) console.error('受信エラー:', error);
@@ -248,7 +338,7 @@ async function readFromSerial() {
         }
     }
 }
-// source: 1 の末尾などに追加
+
 
 /**
  * 12個のPIDパラメータ(Float)を固定長バイナリにパックしてシリアル送信する関数
