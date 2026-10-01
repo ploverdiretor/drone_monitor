@@ -50,6 +50,32 @@ const motorVals = [
     document.getElementById('motorVal2'),
     document.getElementById('motorVal3')
 ];
+// 【追加】校正ステータス表示用DOM要素の取得
+const calibDisplays = {
+    sys:   document.getElementById('calib-sys'),
+    gyro:  document.getElementById('calib-gyro'),
+    accel: document.getElementById('calib-accel'),
+    mag:   document.getElementById('calib-mag')
+};
+
+// 【追加】校正データをUIに反映させるグローバル関数
+window.updateCalibrationStatus = function(sys, gyro, accel, mag) {
+    if (calibDisplays.sys)   calibDisplays.sys.innerText   = sys;
+    if (calibDisplays.gyro)  calibDisplays.gyro.innerText  = gyro;
+    if (calibDisplays.accel) calibDisplays.accel.innerText = accel;
+    if (calibDisplays.mag)   calibDisplays.mag.innerText   = mag;
+
+    // 進捗値(0〜3)に合わせて数値を色分けする演出（3で鮮やかな緑に）
+    const items = [calibDisplays.sys, calibDisplays.gyro, calibDisplays.accel, calibDisplays.mag];
+    items.forEach(el => {
+        if (!el) return;
+        if (el.innerText === "3") {
+            el.style.color = "var(--accent-color)"; // 完了したらグリーン
+        } else {
+            el.style.color = "#ff9f0a"; // 校正中はオレンジ
+        }
+    });
+}
 
 // 【追加】受信データをレベルメーターに反映させるグローバル関数
 window.updateMotorMeters = function(rawValues) {
@@ -705,9 +731,9 @@ if (sendPidBtn) {
     });
 }
 // 追加したトグルボタンとPIDパネルのDOMを取得
-const togglePidBtn = document.getElementById('togglePidBtn');
+//const togglePidBtn = document.getElementById('togglePidBtn');
 const pidPanel = document.getElementById('pidPanel');
-
+/*
 // 表示・非表示を切り替えるイベントリスナー
 if (togglePidBtn && pidPanel) {
     togglePidBtn.addEventListener('click', () => {
@@ -722,3 +748,4 @@ if (togglePidBtn && pidPanel) {
         }
     });
 }
+*/

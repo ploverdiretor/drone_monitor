@@ -217,6 +217,52 @@ async function readFromSerial() {
                 let i = 0;
                 while (i < binaryBuffer.length) {
                     
+                    // 🟨【新設】パターン4: 校正ステータスパケット (0x7C) のバイナリ検出
+                    if (binaryBuffer[i] === 0x7C) {
+                        // 識別コード(1B) + 4つの方位進捗データ(4B) = 計5バイト揃うまで待つ
+                        if (i + 5 > binaryBuffer.length) {
+                            break; 
+                        }
+
+                        // 5バイトのパケットを切り出し
+                        const packet = binaryBuffer.subarray(i, i + 5);
+                        i += 5; // 5バイト分バッファを消費
+
+                        // 2〜5バイト目から各校正データを抽出
+                        const sys   = packet[1];
+                        const gyro  = packet[2];
+                        const accel = packet[3];
+                        const mag   = packet[4];
+
+                        // 💡【追加】mag が 0xFF だった場合はフラッシュへの保存完了ログを出力
+                        if (mag === 0xFF) {
+                            if (outputArea) {
+                                outputArea.value += `[校正完了] データをフラッシュメモリに保存し、通常モードに復帰しました。\n`;
+                                outputArea.scrollTop = outputArea.scrollHeight;
+                            }
+                            // UIの数値をすべて3（完了状態）にしておく
+                            if (typeof window.updateCalibrationStatus === 'function') {
+                                window.updateCalibrationStatus(3, 3, 3, 3);
+                            }
+                            continue;
+                        }
+
+                        // ① UI表示用の数値をリアルタイム更新
+                        if (typeof window.updateCalibrationStatus === 'function') {
+                            window.updateCalibrationStatus(sys, gyro, accel, mag);
+                        }
+
+                        // ② 右側のテキストエリアログに現在の状況を出力
+                        if (outputArea) {
+                            outputArea.value += `[校正進捗] Sys:${sys}, Gyro:${gyro}, Accel:${accel}, Mag:${mag}\n`;
+                            
+                            if (outputArea.value.length > 5000) {
+                                outputArea.value = outputArea.value.substring(2500);
+                            }
+                            outputArea.scrollTop = outputArea.scrollHeight;
+                        }
+                        continue;
+                    }
                     // 🟪 パターン1: 姿勢データパケット (0x7A) の検出
                     if (binaryBuffer[i] === 0x7A) {
                         if (i + 10 > binaryBuffer.length) {

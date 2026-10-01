@@ -79,9 +79,10 @@
                 <button id="calibrationBtn" class="btn-warning">校正開始</button>
             </div>
             <div class="btn-group font-compact" style="margin-top: 10px;">
-                <button id="togglePidBtn">PID表示/非表示</button>
+            <!--  <button id="togglePidBtn">PID表示/非表示</button>-->  
                 <button class="dummy-btn" disabled>ダミー1</button>
                 <button class="dummy-btn" disabled>ダミー2</button>
+                <button class="dummy-btn" disabled>ダミー3</button>
             </div>
         </div>
         <div class="panel">
@@ -92,6 +93,8 @@
             <div class="canvas-wrapper">
                 <canvas id="attitudeCanvas" width="300" height="300" style="border: 1px solid #ccc; background: #222;"></canvas>
             </div>
+
+
             <!-- 【追加】各モーターの受信レベルメーター -->
             <div class="motor-monitor-container">
                 <h3>モーター受信ステータス</h3>
@@ -116,66 +119,88 @@
                     <span id="motorVal3" class="motor-value">0x000</span>
                 </div>
             </div>
+            <!-- 「機体姿勢」のパネル内（既存のモーター受信ステータスの手前など）に追加配置してください -->
+            <div class="motor-monitor-container" style="margin-top: 10px; border-color: rgba(255, 159, 10, 0.3);">
+                <h3 style="color: rgba(255, 159, 10, 0.8); margin-bottom: 8px;">BNO055 校正進捗ステータス (目標: すべて3)</h3>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
+                    <div style="background: #0c0c0d; padding: 6px; border-radius: 4px; border: 1px solid var(--panel-border);">
+                        <div style="font-size: 11px; color: var(--text-muted);">SYS</div>
+                        <div id="calib-sys" style="font-family: monospace; font-size: 16px; font-weight: bold; color: #ff9f0a;">0</div>
+                    </div>
+                    <div style="background: #0c0c0d; padding: 6px; border-radius: 4px; border: 1px solid var(--panel-border);">
+                        <div style="font-size: 11px; color: var(--text-muted);">GYRO</div>
+                        <div id="calib-gyro" style="font-family: monospace; font-size: 16px; font-weight: bold; color: #ff9f0a;">0</div>
+                    </div>
+                    <div style="background: #0c0c0d; padding: 6px; border-radius: 4px; border: 1px solid var(--panel-border);">
+                        <div style="font-size: 11px; color: var(--text-muted);">ACCEL</div>
+                        <div id="calib-accel" style="font-family: monospace; font-size: 16px; font-weight: bold; color: #ff9f0a;">0</div>
+                    </div>
+                    <div style="background: #0c0c0d; padding: 6px; border-radius: 4px; border: 1px solid var(--panel-border);">
+                        <div style="font-size: 11px; color: var(--text-muted);">MAG</div>
+                        <div id="calib-mag" style="font-family: monospace; font-size: 16px; font-weight: bold; color: #ff9f0a;">0</div>
+                    </div>
+                </div>
+            </div>
         </div>
         <!-- 右側：受信パネル -->
         <div class="panel">
             <div class="panel-header-wrap">
                 <h2>受信側 (Hex表示)</h2>
+                <button id="clearBtn" style="width: auto; padding: 4px 12px; font-size: 12px; margin-top: 0;">ログをクリア</button>
+        
             </div>
-            <p style="font-size: 13px; color: #666;">マイコンから復元されて返ってきた4つのデータをHexで表示します。</p>
             <textarea id="outputArea" readonly placeholder="データを受信するとHex表示されます..."></textarea>
-            <button id="clearBtn" style="margin-top: 10px; padding: 5px;">ログをクリア</button>
+            
+            <!-- 一番右側のパネル：PIDパラメータ設定 -->
+            <div id="pidPanel" >
+                <div class="panel-header-wrap">
+                    <h2>PID パラメータ設定 (カスケード制御)</h2>
+                </div>
+                <!-- 軸切り替えボタングループ -->
+                <div class="axis-tab-group">
+                    <button id="btn_tab_pitch" class="tab-btn active" onclick="switchPidTab('pitch')">ピッチ (Pitch)</button>
+                    <button id="btn_tab_roll" class="tab-btn" onclick="switchPidTab('roll')">ロール (Roll)</button>
+                    <button id="btn_tab_yaw" class="tab-btn" onclick="switchPidTab('yaw')">ヨー (Yaw)</button>
+                </div>
+
+                <div class="pid-tuning-container">
+            <!--       <div class="pid-grid-header-shared">
+                        <div>パラメータ</div>
+                        <div>調整スライダー</div>
+                        <div>現在の値</div>
+                    </div>--> 
+
+                    <!-- アウター P -->
+                    <div class="pid-param-row-shared">
+                        <div class="param-label">アウター P</div>
+                        <div class="pid-cell-shared"><input type="range" id="shared_outer_p" min="0" max="10" step="0.1" value="1.0"></div>
+                        <div id="shared_val_op" class="pid-val-shared">1.00</div>
+                    </div>
+
+                    <!-- インナー P -->
+                    <div class="pid-param-row-shared">
+                        <div class="param-label">インナー P</div>
+                        <div class="pid-cell-shared"><input type="range" id="shared_inner_p" min="0" max="10" step="0.1" value="1.0"></div>
+                        <div id="shared_val_ip" class="pid-val-shared">1.00</div>
+                    </div>
+
+                    <!-- インナー I -->
+                    <div class="pid-param-row-shared">
+                        <div class="param-label">インナー I</div>
+                        <div class="pid-cell-shared"><input type="range" id="shared_inner_i" min="0" max="10" step="0.1" value="0.0"></div>
+                        <div id="shared_val_ii" class="pid-val-shared">0.00</div>
+                    </div>
+
+                    <!-- インナー D -->
+                    <div class="pid-param-row-shared">
+                        <div class="param-label">インナー D</div>
+                        <div class="pid-cell-shared"><input type="range" id="shared_inner_d" min="0" max="2" step="0.01" value="0.0"></div>
+                        <div id="shared_val_id" class="pid-val-shared">0.00</div>
+                    </div>
+                </div>
+                <button id="sendPidBtn" style="margin-top: 16px;">PIDパラメータを機体に送信</button>
+            </div>
         </div>
-        <!-- 一番右側のパネル：PIDパラメータ設定 -->
-        <div id="pidPanel" class="panel" style="display: none;">
-            <div class="panel-header-wrap">
-                <h2>PID パラメータ設定 (カスケード制御)</h2>
-            </div>
-            <!-- 軸切り替えボタングループ -->
-            <div class="axis-tab-group">
-                <button id="btn_tab_pitch" class="tab-btn active" onclick="switchPidTab('pitch')">ピッチ (Pitch)</button>
-                <button id="btn_tab_roll" class="tab-btn" onclick="switchPidTab('roll')">ロール (Roll)</button>
-                <button id="btn_tab_yaw" class="tab-btn" onclick="switchPidTab('yaw')">ヨー (Yaw)</button>
-            </div>
-
-            <div class="pid-tuning-container">
-                <div class="pid-grid-header-shared">
-                    <div>パラメータ</div>
-                    <div>調整スライダー</div>
-                    <div>現在の値</div>
-                </div>
-
-                <!-- アウター P -->
-                <div class="pid-param-row-shared">
-                    <div class="param-label">アウター P</div>
-                    <div class="pid-cell-shared"><input type="range" id="shared_outer_p" min="0" max="10" step="0.1" value="1.0"></div>
-                    <div id="shared_val_op" class="pid-val-shared">1.00</div>
-                </div>
-
-                <!-- インナー P -->
-                <div class="pid-param-row-shared">
-                    <div class="param-label">インナー P</div>
-                    <div class="pid-cell-shared"><input type="range" id="shared_inner_p" min="0" max="10" step="0.1" value="1.0"></div>
-                    <div id="shared_val_ip" class="pid-val-shared">1.00</div>
-                </div>
-
-                <!-- インナー I -->
-                <div class="pid-param-row-shared">
-                    <div class="param-label">インナー I</div>
-                    <div class="pid-cell-shared"><input type="range" id="shared_inner_i" min="0" max="10" step="0.1" value="0.0"></div>
-                    <div id="shared_val_ii" class="pid-val-shared">0.00</div>
-                </div>
-
-                <!-- インナー D -->
-                <div class="pid-param-row-shared">
-                    <div class="param-label">インナー D</div>
-                    <div class="pid-cell-shared"><input type="range" id="shared_inner_d" min="0" max="2" step="0.01" value="0.0"></div>
-                    <div id="shared_val_id" class="pid-val-shared">0.00</div>
-                </div>
-            </div>
-            <button id="sendPidBtn" style="margin-top: 16px;">PIDパラメータを機体に送信</button>
-        </div>
-
 
     </div>
     <script src="serial.js"></script>
