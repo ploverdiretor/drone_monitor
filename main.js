@@ -254,203 +254,22 @@ resetAttitudeBtn.addEventListener('click', () => {
     syncAllDisplays();
     sendFlightDataThrottled();
 });
-/*
-// 方位目盛り（コンパス）付きアティチュード・インジケーターの描画関数
-function drawAttitude(optPitch, optRoll, optYaw) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+// 💡 「機体からPIDを読込」ボタンのDOM要素を取得
+const requestPidBtn = document.getElementById('requestPidBtn');
 
-    // 引数（受信データ）が存在すればそれを使用し、無ければスライダーの値を読み取る
-    const pitchDeg = (optPitch !== undefined) ? optPitch : Number(sliderPitch.value);
-    const rollDeg  = (optRoll  !== undefined) ? optRoll  : Number(sliderRoll.value);
-    const yawDeg   = (optYaw   !== undefined) ? optYaw   : Number(sliderYaw.value);
-
-    // ラジアンに変換
-    const rollRad = rollDeg * Math.PI / 180;
-    const yawRad = yawDeg * Math.PI / 180;
-
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const radius = 95;      // 水平儀（中央の円）の半径
-    const compassRadius = 115; // コンパス（外周の円）の半径
-
-    // ==========================================
-    // 1. 動く背景（空と大地）の描画
-    // ==========================================
-    ctx.save();
-    
-    // 円形のマスクを作成（メーターの外枠からはみ出さないようにする）
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-    ctx.clip();
-
-    // 画面中心を回転・移動の基準にする
-    ctx.translate(cx, cy);
-    ctx.rotate(-rollRad); // ロール角に応じて背景を回転
-    
-    // ピッチ角に応じて背景を上下にシフト
-    const pitchOffset = pitchDeg * 1.5; 
-    ctx.translate(0, pitchOffset);
-
-    // 空（上半分）を描画：鮮やかなスカイブルー
-    ctx.fillStyle = '#007aff';
-    ctx.fillRect(-radius * 2, -radius * 4, radius * 4, radius * 4);
-
-    // 大地（下半分）を描画：落ち着いたブラウン
-    ctx.fillStyle = '#543d2b';
-    ctx.fillRect(-radius * 2, 0, radius * 4, radius * 4);
-
-    // 水平線
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(-radius * 1.5, 0);
-    ctx.lineTo(radius * 1.5, 0);
-    ctx.stroke();
-
-    // ピッチ目盛り（ラダー）の描画
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineWidth = 1.5;
-
-    const pitchLines = [-30, -20, -10, 10, 20, 30];
-    pitchLines.forEach(deg => {
-        const y = -deg * 1.5;
-        const width = deg % 20 === 0 ? 40 : 20;
-
-        ctx.beginPath();
-        ctx.moveTo(-width / 2, y);
-        ctx.lineTo(width / 2, y);
-        ctx.stroke();
-
-        ctx.fillText(Math.abs(deg).toString(), -width / 2 - 12, y);
-        ctx.fillText(Math.abs(deg).toString(), width / 2 + 12, y);
-    });
-
-    ctx.restore(); // 背景のクリッピングと変形をリセット
-
-    // ==========================================
-    // 2. 水平儀のベゼル（内枠）の描画
-    // ==========================================
-    ctx.strokeStyle = '#2d2d34';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-    ctx.stroke();
-
-    // ==========================================
-    // 3. 【新機能】外周コンパス（方位目盛り）の描画
-    // ==========================================
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(-yawRad); // ヨー角（方位）の反転回転を適用
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.fillStyle = '#e3e3e6';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // 30度刻みで目盛りと方角（N, E, S, W）を描画
-    for (let angle = 0; angle < 360; angle += 30) {
-        const rad = (angle - 90) * Math.PI / 180; // 0度が真上（北）にくるように補正
-        const cos = Math.cos(rad);
-        const sin = Math.sin(rad);
-
-        // 目盛り線の開始点と終了点
-        const startX = cos * radius;
-        const startY = sin * radius;
-        const endX = cos * (compassRadius - 5);
-        const endY = sin * (compassRadius - 5);
-
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.lineWidth = angle % 90 === 0 ? 2 : 1; // 東西南北は太い線にする
-        ctx.stroke();
-
-        // 文字の配置座標
-        const textX = cos * (compassRadius + 8);
-        const textY = sin * (compassRadius + 8);
-
-        // 東西南北（N,E,S,W）と数値の出し分け
-        if (angle === 0) {
-            ctx.fillStyle = '#ff3b30'; // 北（N）だけ警告の赤色
-            ctx.fillText('0', textX, textY);
-        } else if (angle === 90) {
-            ctx.fillStyle = '#e3e3e6';
-            ctx.fillText('09', textX, textY);
-        } else if (angle === 180) {
-            ctx.fillStyle = '#e3e3e6';
-            ctx.fillText('18', textX, textY);
-        } else if (angle === 270) {
-            ctx.fillStyle = '#e3e3e6';
-            ctx.fillText('27', textX, textY);
+// 💡 ボタンクリック時のイベントリスナーを登録
+if (requestPidBtn) {
+    requestPidBtn.addEventListener('click', () => {
+        // 既存の1バイト送信関数を使って「0x7F」をダイレクトに送信
+        if (typeof sendSingleCommand === 'function') {
+            sendSingleCommand(0x7F); 
         } else {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.font = '9px monospace';
-            ctx.fillText((angle / 10).toString().padStart(2, '0'), textX, textY); // 航空計器風に10の位で表示（例：300度→30）
-            ctx.font = 'bold 11px sans-serif'; // フォントを元に戻す
+            console.error("sendSingleCommand関数が定義されていません。");
+            alert("シリアル通信の準備ができていません。");
         }
-    }
-    ctx.restore();
-
-    // コンパスの最外周の細い円線
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(cx, cy, compassRadius + 16, 0, 2 * Math.PI);
-    ctx.stroke();
-
-    // ==========================================
-    // 4. 固定ヘディングインジケーター（最上部の赤い三角）
-    // ==========================================
-    ctx.fillStyle = '#ff3b30';
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - compassRadius - 14);
-    ctx.lineTo(cx - 6, cy - compassRadius - 26);
-    ctx.lineTo(cx + 6, cy - compassRadius - 26);
-    ctx.closePath();
-    ctx.fill();
-
-    // ==========================================
-    // 5. 自機マーク（画面中央に固定された黄色のシンボル）
-    // ==========================================
-    ctx.strokeStyle = '#ffcc00';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    ctx.beginPath();
-    ctx.moveTo(cx - 40, cy);
-    ctx.lineTo(cx - 15, cy);
-    ctx.lineTo(cx - 15, cy + 8);
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, 1.5, 0, 2 * Math.PI);
-    ctx.moveTo(cx + 40, cy);
-    ctx.lineTo(cx + 15, cy);
-    ctx.lineTo(cx + 15, cy + 8);
-    ctx.stroke();
-
-    // ==========================================
-    // 6. テキスト情報のオーバーレイ表示
-    // ==========================================
-    ctx.fillStyle = '#e3e3e6';
-    ctx.font = 'bold 11px monospace';
-    ctx.textAlign = 'left';
-    
-    // X座標: 15px (左端), Y座標: 25px / 40px に変更して上端の隅へ配置
-    ctx.fillText(`PITCH: ${pitchDeg >= 0 ? '+' : ''}${pitchDeg}°`, 15, 25);
-    ctx.fillText(`ROLL:  ${rollDeg >= 0 ? '+' : ''}${rollDeg}°`, 15, 40);
-    
-    // 【修正】右端に寄せる設定
-    ctx.textAlign = 'right';
-    // X座標: canvas.width - 15px (右端), Y座標: 25px に変更して上端の隅へ配置
-    ctx.fillText(`YAW:   ${yawDeg}°`, canvas.width - 15, 25);
+    });
 }
-*/
+
 // 方位目盛り（コンパス）付きアティチュード・インジケーターの描画関数
 function drawAttitude(pitchDeg, rollDeg, yawDeg) {
     // 💡 万が一引数が空（初期化時など）の場合は0度に設定
@@ -684,7 +503,7 @@ const sharedDisplays = {
     inner_d: document.getElementById('shared_val_id')
 };
 
-// 軸タブを切り替えるグローバル関数 (HTMLのonclickから呼ばれます)
+// 軸タブを切り替えるグローバル関数 (HTMLのonclickなどから呼ばれます)
 window.switchPidTab = function(axis) {
     currentPidAxis = axis;
 
@@ -699,53 +518,49 @@ window.switchPidTab = function(axis) {
 
     // メモリから切り替えた軸の数値を読み込んで、4本のスライダー・数値を画面に同期
     Object.keys(sharedSliders).forEach(param => {
+        // 💡 メモリには常に0〜1000の整数が入っています
         const savedValue = pidDataMemory[axis][param];
-        if (sharedSliders[param]) sharedSliders[param].value = savedValue;
-        if (sharedDisplays[param]) sharedDisplays[param].innerText = Number(savedValue).toFixed(2);
+        
+        if (sharedSliders[param]) {
+            // スライダーには整数のままそのままセット
+            sharedSliders[param].value = savedValue;
+        }
+        if (sharedDisplays[param]) {
+            // 💡 画面右側の緑色のテキスト表示の瞬間だけ、100で割って小数（例: 1.39）にする
+            sharedDisplays[param].innerText = (savedValue / 100.0).toFixed(2);
+        }
     });
 };
 
-// 4本のスライダーを動かしたとき、現在選択中の軸メモリへ即座に値を上書き保存する処理
+
+// 4本のスライダーを動かしたとき、現在選択中の軸メモリへ即座に値を保存する処理
 Object.keys(sharedSliders).forEach(param => {
     const slider = sharedSliders[param];
     if (slider) {
         slider.addEventListener('input', () => {
             const val = Number(slider.value);
-            // 現在選択されている軸のメモリデータを更新
+            // 💡【重要】ドローン側へ正確に整数値を届けるため、
+            // スライダーの生値（0〜1000スケール等）をそのままメモリへ上書き保存します
             pidDataMemory[currentPidAxis][param] = val;
-            // 画面の数値テキストを更新
-            if (sharedDisplays[param]) sharedDisplays[param].innerText = val.toFixed(2);
+            
+            // 画面の数値テキスト表示は、物理ゲイン(0.00〜10.00など)に合わせて100.0で割って表示
+            if (sharedDisplays[param]) sharedDisplays[param].innerText = (val / 100.0).toFixed(2);
         });
     }
 });
 
-// 送信ボタンが押された時、12個の数値をまとめてシリアル送信関数へ渡す処理
-if (sendPidBtn) {
-    sendPidBtn.addEventListener('click', () => {
-        // メモリに保存されている現在の12個のPIDデータを送信関数に渡す
+// 💡【修正】IDから直接イベント登録を行い、確実に送信ボタンのクリックをキャッチします
+const targetSubmitBtn = document.getElementById('sendPidBtn');
+if (targetSubmitBtn) {
+    targetSubmitBtn.onclick = function() {
         if (typeof sendPidData === 'function') {
+            // メモリに保存されている12個のPIDデータを送信関数に渡す
             sendPidData(pidDataMemory); 
         } else {
             console.error("sendPidData関数が定義されていません。");
         }
-    });
+    };
 }
 // 追加したトグルボタンとPIDパネルのDOMを取得
 //const togglePidBtn = document.getElementById('togglePidBtn');
 const pidPanel = document.getElementById('pidPanel');
-/*
-// 表示・非表示を切り替えるイベントリスナー
-if (togglePidBtn && pidPanel) {
-    togglePidBtn.addEventListener('click', () => {
-        if (pidPanel.style.display === 'none') {
-            // 非表示なら表示する (CSSでflex指定されている親要素に合わせるため空文字にするか 'block' にする)
-            pidPanel.style.display = ''; 
-            togglePidBtn.style.backgroundColor = 'var(--primary-color)'; // アクティブ時に色を変える（任意）
-        } else {
-            // 表示されているなら非表示にする
-            pidPanel.style.display = 'none';
-            togglePidBtn.style.backgroundColor = ''; // 色を元に戻す
-        }
-    });
-}
-*/

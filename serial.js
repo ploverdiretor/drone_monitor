@@ -217,6 +217,67 @@ async function readFromSerial() {
                 let i = 0;
                 while (i < binaryBuffer.length) {
                     
+                    // 🟫【新設】パターン5: ドローンからのPIDパラメータ返送パケット (0x7D) のバイナリ検出
+                    if (binaryBuffer[i] === 0x7D) {
+                        // 識別コード(1B) + 12パラメータ × 2B = 計25バイト揃うまで待つ
+                        if (i + 25 > binaryBuffer.length) {
+                            break; 
+                        }
+
+                        // 25バイトのパケットを切り出し
+                        const packet = binaryBuffer.subarray(i, i + 25);
+                        i += 25; // 25バイト分バッファを消費
+
+                        // データの並び順およびプロパティ名を定義（C++の構造体と完全一致）
+                        const axes = ['pitch', 'roll', 'yaw']; //
+                        const params = ['outer_p', 'inner_p', 'inner_i', 'inner_d']; //
+                        
+                        let pIdx = 1; // パケット読み込み位置 (1バイト目は0x7Dなので2バイト目から開始)
+
+                        // 25バイトのバイナリから12個の数値を復元してメモリ(pidDataMemory)を更新
+                        for (const axis of axes) {
+                            for (const param of params) {
+                                const upper4 = packet[pIdx];
+                                const lower6 = packet[pIdx + 1];
+                                
+                                // 💡 上位4ビットと下位6ビットを結合して元の数値(0〜1000)を復元
+                                const rawValue = (upper4 << 6) | lower6;
+
+                                // main.js側のグローバルメモリ（pidDataMemory）に保存
+                                if (typeof pidDataMemory !== 'undefined' && pidDataMemory[axis]) {
+                                    // 💡【修正】再送信時のビットシフト不具合を防ぐため、
+                                    // メモリには小数ではなく 0〜1000 の整数値のまま保存します。
+                                    pidDataMemory[axis][param] = rawValue;
+                                }
+
+                                pIdx += 2;
+                            }
+                        }
+
+                        // 💡 画面上のスライダーと数値表示へ自動反映
+                        // main.js側に定義されている共通タブ切り替え関数を現在の軸で再実行し、画面を強制リフレッシュ
+                        if (typeof window.switchPidTab === 'function' && typeof currentPidAxis !== 'undefined') {
+                            window.switchPidTab(currentPidAxis); // 現在開いているタブのUI表示を最新にする
+                        }
+
+                        // 右側のテキストエリアログに完了通知を出力
+                        if (outputArea) {
+                            outputArea.value += `[受信] ドローン本体のPIDパラメータを読み込み、UIに同期しました。\n`;
+                            
+                            if (outputArea.value.length > 5000) {
+                                outputArea.value = outputArea.value.substring(2500);
+                            }
+                            outputArea.scrollTop = outputArea.scrollHeight;
+                        }
+                        continue;
+                    }
+
+
+
+
+
+
+
                     // 🟨【新設】パターン4: 校正ステータスパケット (0x7C) のバイナリ検出
                     if (binaryBuffer[i] === 0x7C) {
                         // 識別コード(1B) + 4つの方位進捗データ(4B) = 計5バイト揃うまで待つ
@@ -265,12 +326,12 @@ async function readFromSerial() {
                     }
                     // 🟪 パターン1: 姿勢データパケット (0x7A) の検出
                     if (binaryBuffer[i] === 0x7A) {
-                        if (i + 10 > binaryBuffer.length) {
+                        if (i + 16 > binaryBuffer.length) {
                             break; // データが揃うまで待つ
                         }
 
-                        const packet = binaryBuffer.subarray(i, i + 10);
-                        i += 10;
+                        const packet = binaryBuffer.subarray(i, i + 16);
+                        i += 16;
 
                         // 16bit整数への復元
                         let rawAngles = new Int16Array(3);
@@ -283,10 +344,37 @@ async function readFromSerial() {
                             if (combined & 0x8000) combined |= 0xFFFF0000; 
                             rawAngles[axis] = combined;
                         }
-
+                        const currentPitch = rawAngles[1] / 100.0;
+                        const currentRoll  = rawAngles[2] / 100.0;
+                        const currentYaw   = rawAngles[0] / 100.0;
+                        
                         // Canvasの描画（引数を渡してダイレクトに描画）
                         if (typeof drawAttitude === 'function') {
-                            drawAttitude(rawAngles[1] / 100.0, rawAngles[2] / 100.0, rawAngles[0] / 100.0);
+                            drawAttitude(currentPitch, currentRoll, currentYaw);
+                        }
+
+                        // --- 2. 💡【新設】ドローンが返してきた目標姿勢角度の復元 ---
+                        // 後半のバイト(10B〜15B)を2バイトずつ結合し、符号付き16bit整数(Int16)に戻す
+                        let targetYawRaw   = (packet[10] << 8) | packet[11];
+                        let targetPitchRaw = (packet[12] << 8) | packet[13];
+                        let targetRollRaw  = (packet[14] << 8) | packet[15];
+
+                        // JavaScript側で2の補数（負数）を正しくキャスト処理
+                        if (targetYawRaw & 0x8000)   targetYawRaw |= 0xFFFF0000;
+                        if (targetPitchRaw & 0x8000) targetPitchRaw |= 0xFFFF0000;
+                        if (targetRollRaw & 0x8000)  targetRollRaw |= 0xFFFF0000;
+
+                        const targetPitch = targetPitchRaw / 100.0;
+                        const targetRoll  = targetRollRaw / 100.0;
+                        const targetYaw   = targetYawRaw / 100.0;
+
+                        // 💡【新設】復元したデータをグラフ描画エンジンにプール（蓄積）する
+                        if (typeof window.pushGraphData === 'function') {
+                            window.pushGraphData(
+                                targetPitch, currentPitch,
+                                targetRoll,  currentRoll,
+                                targetYaw,   currentYaw
+                            );
                         }
                         continue;
                     }
@@ -387,8 +475,7 @@ async function readFromSerial() {
 
 
 /**
- * 12個のPIDパラメータ(Float)を固定長バイナリにパックしてシリアル送信する関数
- * param {Object} pidMemory - pidDataMemory オブジェクト { pitch: {...}, roll: {...}, yaw: {...} }
+ * 💡【修正版】12個のPIDパラメータを固定長バイナリ(25B)にパックしてシリアル送信する関数
  */
 async function sendPidData(pidMemory) {
     if (!writer) {
@@ -396,15 +483,10 @@ async function sendPidData(pidMemory) {
         return;
     }
 
-    // パラメータを浮動小数点数から固定小数点（整数）に変換するための倍率
-    // 例: 1.25 -> 1250 (1000倍)
-    const MULTIPLIER = 1000; 
-
     // パケット構造: ヘッダー(1バイト) + 12パラメータ × 2バイト = 計25バイト
     const packet = new Uint8Array(25);
     packet[0] = 0x7D; // PID送信用の識別ヘッダー
 
-    // パラメータをパケットへ格納する順番の定義
     const axes = ['pitch', 'roll', 'yaw'];
     const params = ['outer_p', 'inner_p', 'inner_i', 'inner_d'];
     
@@ -412,48 +494,32 @@ async function sendPidData(pidMemory) {
 
     for (const axis of axes) {
         for (const param of params) {
-/*            // メモリから値を取得
-            const floatVal = pidMemory[axis][param];
-            
-            // 固定小数点数（整数）に変換して四捨五入
-            let intVal = Math.round(floatVal * MULTIPLIER);
-
-            // 16bit符号付き整数(Int16)の範囲にクランプガード (-32768 〜 32767)
-            if (intVal < -32768) intVal = -32768;
-            if (intVal > 32767) intVal = 32767;
-
-            // 上位バイトと下位バイトに分解してパケットに格納
-            packet[index]     = (intVal >> 8) & 0xFF; // Upper byte
-            packet[index + 1] = intVal & 0xFF;        // Lower byte
-            
-            index += 2;*/
-            // メモリから値を取得し、念のため数値型に変換
+            // メモリから値（0〜1000の整数）を取得
             let val = Number(pidMemory[axis][param]);
 
-            // ⚠️ 0〜1000の範囲内に安全ガード（クランプ）
-            if (val < 0) val = 0;
+            // 0〜1000の範囲内に安全ガード（クランプ）
+            if (isNaN(val) || val < 0) val = 0;
             if (val > 1000) val = 1000;
 
-            // 💡 データの分割ロジック
-            // 0〜1000は最大10ビット必要なため、上位4ビット・下位6ビットに切り分ける
-            const upper4 = (val >> 6) & 0x0F; // 6ビット右シフトして、下位4ビット分をマスク抽出
-            const lower6 = val & 0x3F;        // 下位6ビット分(0x3F = 0b00111111)をマスク抽出
+            // 💡 10ビットデータを上位4ビット・下位6ビットに正確に分割
+            const upper4 = (val >> 6) & 0x0F; 
+            const lower6 = val & 0x3F;        
 
             // パケットに格納
             packet[index]     = upper4; // 上位4ビットデータ
             packet[index + 1] = lower6; // 下位6ビットデータ
             
-            index += 2; // 次のパラメータへ（2バイト進める）
+            index += 2; // 2バイト進める
         }
     }
 
     try {
         await writer.write(packet);
         
-        // ユーザー向けに送信ログを出力（任意）
+        // 受信側のテキストエリアに送信完了を出力
         const outputArea = document.getElementById('outputArea');
         if (outputArea) {
-            outputArea.value += `[送信] PIDパラメータを送信しました (${packet.length} bytes)\n`;
+            outputArea.value += `[送信] PIDパラメータをドローンへ送信しました (25 bytes)\n`;
             outputArea.scrollTop = outputArea.scrollHeight;
         }
     } catch (error) {
@@ -461,6 +527,10 @@ async function sendPidData(pidMemory) {
         alert('PIDパラメータの送信に失敗しました。');
     }
 }
+
+
+
+
 /**
  * 💡 新設：特定の1バイトデータ（コマンド）をダイレクトにシリアル送信する関数
  * @param {number} commandByte - 送信したい1バイトの数値 (例: 0x7C)

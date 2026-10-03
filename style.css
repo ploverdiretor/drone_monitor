@@ -53,35 +53,47 @@ h1, .app-title {
 
 /* 1番目：送信側（スロットル） */
 .field > .panel:nth-child(1) {
-    flex: 1.8; 
+    flex: 1; 
     min-width: 320px;
 }
 
 /* 2番目：中央（Canvas・姿勢） */
 .field > .panel:nth-child(2) {
-    flex: 1.5;
+    flex: 1;
     min-width: 320px;
-    max-width: 400px;
+ /*   max-width: 400px;*/
+}
+/* 3番目：新・中央右（追従性モニター ＆ PIDパラメータ設定の縦並びカラム） */
+.field > .panel:nth-child(3) {
+    flex: 1.2;
+    min-width: 420px;
+    display: flex;
+    flex-direction: column; /* 💡 内部のパネルを縦に並べる */
+    gap: 20px;              /* 💡 縦に並んだパネル間の隙間 */
+    background: transparent; /* この外枠パネル自体は透明にしておく */
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+/* 💡 3番目の列の中に縦に並ぶ子パネルたちの高さを均等（同じ高さ）にする設定 */
+.field > .panel:nth-child(3) > .sub-panel {
+    flex: 1; /* 💡 これにより、上下のパネルがちょうど半々の同じ高さになります */
+    /* 既存の.panelのスタイルを継承させるため、HTML側でクラスを併記します */
 }
 
-/* 3番目：受信側（Hex表示ログ） */
-.field > .panel:nth-child(3) {
-    flex: 1.8;
-    min-width: 300px;
-    justify-content: flex-start;
+/* 4番目：受信側（Hex表示ログ） */
+.field > .panel:nth-child(4) {
+    flex: 1;
+    min-width: 320px;
 }
+
 #clearBtn {
     width: auto;         /* ボタンが横いっぱいに広がらないようにガード */
     padding: 6px 12px;   /* ヘッダーに収まるよう上下を少しタイトに */
     font-size: 12px;     /* 文字を少し小さくしてシャープに */
     margin: 0;           /* 余計なマージンをリセット */
 }
-/* 4番目：PIDパラメータ設定（新設） */
-.field > .panel:nth-child(4) {
-    flex: 1.5;
-    min-width: 460px; /* 横並びのスライダーや値が窮屈に潰れないよう広めに確保 */
-    align-self: flex-start;
-}
+
 
 /* ==========================================
    パネルヘッダー & ステータス表示の調整
@@ -470,4 +482,9 @@ textarea {
     margin-top: auto;
     border-top: 1px dashed var(--panel-border);
     padding-top: 15px;
+}
+/* 受信ログ内のテキストエリアの高さを、右側のパネル全体の高さ（自動伸長）に合わせてフィットさせる */
+#outputArea {
+    flex: 1;
+    height: auto; /* 固定高さを解除して隙間を埋める */
 }
