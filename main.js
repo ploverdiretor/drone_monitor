@@ -232,10 +232,13 @@ sliderYaw.addEventListener('input', () => {
     sendFlightDataThrottled();
 });
 
-// ログ消去ボタン
+// ログ消去ボタンの処理を2つのエリアに対応
 clearBtn.addEventListener('click', () => { 
+    const motorArea = document.getElementById('motorArea');
+    if (motorArea) motorArea.value = ''; 
     if (outputArea) outputArea.value = ''; 
 });
+
 
 // 0強制送信ボタン
 zeroBtn.addEventListener('click', () => {

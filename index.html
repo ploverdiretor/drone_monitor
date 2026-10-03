@@ -207,14 +207,22 @@
 
         </div>
 
-        <!-- 右側：受信パネル -->
-        <div class="panel">
+        <!-- 4番目：受信側（Hex表示ログ） -->
+        <div class="panel" style="flex: 1; min-width: 320px;">
             <div class="panel-header-wrap">
                 <h2>受信側 (Hex表示)</h2>
-                <button id="clearBtn" style="width: auto; padding: 4px 12px; font-size: 12px; margin-top: 0;">ログをクリア</button>
+                <button id="clearBtn">ログをクリア</button>
             </div>
-            <textarea id="outputArea" readonly placeholder="データを受信するとHex表示されます..."></textarea>
+            
+            <!-- 💡 モーター出力専用のログエリア（上側） -->
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: bold;">モーター出力ログ</div>
+            <textarea id="motorArea" readonly style="height: 180px; margin-bottom: 12px;"></textarea>
+            
+            <!-- 💡 それ以外の通知・PID・システムログエリア（下側） -->
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: bold;">システム・通信ログ</div>
+            <textarea id="outputArea" readonly style="height: 180px;"></textarea>
         </div>
+
 
     </div>
     <script src="serial.js"></script>

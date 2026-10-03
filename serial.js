@@ -378,38 +378,30 @@ async function readFromSerial() {
                         }
                         continue;
                     }
-                    // 🟦 【新設】パターン3: モーターデータパケット (0x7E) のバイナリ検出
+                    // 🟦 パターン3: モーターデータパケット (0x7E) のバイナリ検出処理内
                     if (binaryBuffer[i] === 0x7E) {
-                        // 9バイト揃うまで次回のデータ受信を待つ
-                        if (i + 9 > binaryBuffer.length) {
-                            break; 
-                        }
-
-                        // 9バイトのパケットを切り出し
+                        if (i + 9 > binaryBuffer.length) { break; }
                         const packet = binaryBuffer.subarray(i, i + 9);
-                        i += 9; // 9バイト消費
+                        i += 9;
 
-                        // 2バイトずつ結合して元の4つのモーター値(0〜1000)を復元
                         let motorValues = [];
                         for (let m = 0; m < 4; m++) {
                             const val = (packet[1 + m * 2] << 8) | packet[2 + m * 2];
-                            motorValues.push(String(val)); // 既存のメーター関数に合わせるため文字列型にして格納
+                            motorValues.push(String(val));
                         }
 
-                        // 中央下のグリーンのレベルメーターへダイレクトに超高速反映！
                         if (typeof window.updateMotorMeters === 'function') {
                             window.updateMotorMeters(motorValues);
                         }
 
-                        // 右側テキストエリアへ16進数ログを出力（文字列処理をここだけに限定して軽量化）
-                        if (outputArea) {
+                        // 💡【修正】モーター出力専用エリア（motorArea）へ出力
+                        const motorArea = document.getElementById('motorArea');
+                        if (motorArea) {
                             const hexLine = motorValues.map(v => "0x" + Math.trunc(Number(v)).toString(16).toUpperCase().padStart(3, '0')).join(', ');
-                            outputArea.value += `[モーター出力] ${hexLine}\n`;
+                            motorArea.value += `[モーター出力] ${hexLine}\n`;
                             
-                            if (outputArea.value.length > 5000) {
-                                outputArea.value = outputArea.value.substring(2500);
-                            }
-                            outputArea.scrollTop = outputArea.scrollHeight;
+                            if (motorArea.value.length > 5000) { motorArea.value = motorArea.value.substring(2500); }
+                            motorArea.scrollTop = motorArea.scrollHeight;
                         }
                         continue;
                     }
@@ -423,7 +415,7 @@ async function readFromSerial() {
                         // 外で生成した globalDecoder を使うことでフリーズ（遅延）を防止
                         const cleanLine = globalDecoder.decode(lineBytes).trim();
                         
-                        // 文字列判定の高速化（startsWithを使用）
+                        // 🟩 パターン2: テキストログデータ（改行コード基準）の検出処理内
                         if (cleanLine.startsWith("RECV:") || cleanLine.includes("RECV:")) {
                             const startIdx = cleanLine.indexOf("RECV:");
                             const rawValues = cleanLine.substring(startIdx).replace("RECV:", "").split(',');
@@ -433,16 +425,14 @@ async function readFromSerial() {
                                     window.updateMotorMeters(rawValues);
                                 }
 
-                                // ログエリアの更新（表示が追いつかない原因になるため、スクロール処理を軽量化）
-                                if (outputArea) {
+                                // 💡【修正】テキスト形式のモーターデータも motorArea へ出力
+                                const motorArea = document.getElementById('motorArea');
+                                if (motorArea) {
                                     const hexLine = rawValues.map(v => "0x" + Math.trunc(Number(v)).toString(16).toUpperCase().padStart(3, '0')).join(', ');
-                                    outputArea.value += `[モーター] ${hexLine}\n`;
+                                    motorArea.value += `[モーター] ${hexLine}\n`;
                                     
-                                    // ログが長くなりすぎたら古いものを消す（ブラウザを重くさせない対策）
-                                    if (outputArea.value.length > 5000) {
-                                        outputArea.value = outputArea.value.substring(2500);
-                                    }
-                                    outputArea.scrollTop = outputArea.scrollHeight;
+                                    if (motorArea.value.length > 5000) { motorArea.value = motorArea.value.substring(2500); }
+                                    motorArea.scrollTop = motorArea.scrollHeight;
                                 }
                             }
                         }
@@ -519,7 +509,7 @@ async function sendPidData(pidMemory) {
         // 受信側のテキストエリアに送信完了を出力
         const outputArea = document.getElementById('outputArea');
         if (outputArea) {
-            outputArea.value += `[送信] PIDパラメータをドローンへ送信しました (25 bytes)\n`;
+            outputArea.value += `[送信] PIDパラメータをドローンへ送信しました\n`;
             outputArea.scrollTop = outputArea.scrollHeight;
         }
     } catch (error) {
