@@ -25,6 +25,10 @@ const ctx = canvas.getContext('2d');
 
 const sendPidBtn = document.getElementById('sendPidBtn');
 
+
+
+
+
 const sliders = [
     document.getElementById('slider0'),
     document.getElementById('slider1'),
@@ -247,16 +251,27 @@ zeroBtn.addEventListener('click', () => {
 
 // 姿勢（ピッチ、ロール、ヨー）を0にするボタンイベント
 resetAttitudeBtn.addEventListener('click', () => {
-    // 各スライダーの値を0に設定
+    // 1. 各スライダーの値を0に設定
     sliderPitch.value = 0;
     sliderRoll.value = 0;
     sliderYaw.value = 0;
 
-    // 計算とデータ送信、画面表示の更新を同時に実行
-    //calculateAndSendMotorData();
+    // 2. 💡【追加】ドローン本体へ「姿勢リセット」の1バイトコマンド 0x79 を送信
+    if (typeof sendSingleCommand === 'function') {
+        sendSingleCommand(0x79); 
+    } else {
+        console.error("sendSingleCommand関数が定義されていません。");
+    }
+
+    // 計算とデータ送信、画面表示の更新を実行
     syncAllDisplays();
     sendFlightDataThrottled();
 });
+
+
+
+
+
 // 💡 「機体からPIDを読込」ボタンのDOM要素を取得
 const requestPidBtn = document.getElementById('requestPidBtn');
 

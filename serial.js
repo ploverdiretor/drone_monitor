@@ -10,6 +10,16 @@ let receivedBuffer = "";
 let lastSendTime = 0;
 let throttleTimeout = null;
 
+// 💡【新設】急激な操作入力をなめらかにするためのフィルター設定
+let filteredPitch = 0.0;
+let filteredRoll  = 0.0;
+let filteredYaw   = 0.0;
+
+// 💡 フィルターの係数（0.0〜1.0）
+// 値が小さいほどなめらか（マイルド）になり、1.0でフィルター無し（元の一瞬の動き）になります
+// まずは「0.15」から試してみるのが非常におすすめです
+const FILTER_RC = 0.10; 
+
 // 初期データ (4モーター分)
 const sliderData =[48, 48, 48, 48]; // 初期値を48に設定
 
@@ -147,7 +157,7 @@ function sendFlightDataThrottled() {
 
     if (flightThrottleTimeout) clearTimeout(flightThrottleTimeout);
 
-    const executeFlightSend = () => {
+/*    const executeFlightSend = () => {
         // UIのスライダーから最新の値を読み出して送信関数へ渡す
         const throttleVal = Number(document.getElementById('sliderAll').value); // 一括制御（スロットル）
         const pitchVal    = Number(sliderPitch.value);
@@ -155,6 +165,35 @@ function sendFlightDataThrottled() {
         const yawVal      = Number(sliderYaw.value);
 
         sendFlightControlData(throttleVal, pitchVal, rollVal, yawVal);
+    };*/
+    
+    const executeFlightSend = () => {
+        // UIのスライダーから最新の「生の目標値」を読み出す
+        const throttleVal = Number(document.getElementById('sliderAll').value); 
+        const targetPitch = Number(sliderPitch.value);
+        const targetRoll  = Number(sliderRoll.value);
+        const targetYaw   = Number(sliderYaw.value);
+
+        // 💡【追加】一次遅れフィルターの数式を適用
+        // 「前回の値」と「現在のスライダーの値」のギャップをマイルドに埋める計算です
+        filteredPitch = filteredPitch + FILTER_RC * (targetPitch - filteredPitch);
+        filteredRoll  = filteredRoll  + FILTER_RC * (targetRoll  - filteredRoll);
+        filteredYaw   = filteredYaw   + FILTER_RC * (targetYaw   - filteredYaw);
+
+        // 💡【追加】微小なチラつき（ノイズ）を完全にカットする処理
+        // 小数点以下の細かなブレを四捨五入（Math.round）して、カチッとした整数に戻します
+        let sendPitch = Math.round(filteredPitch);
+        let sendRoll  = Math.round(filteredRoll);
+        let sendYaw   = Math.round(filteredYaw);
+
+        // 💡 スライダーが中央（0）にある時は、確実に「完全な0」をドローンに届けるセーフティガード
+        if (targetPitch === 0 && Math.abs(sendPitch) <= 1) sendPitch = 0;
+        if (targetRoll  === 0 && Math.abs(sendRoll)  <= 1) sendRoll  = 0;
+        if (targetYaw   === 0 && Math.abs(sendYaw)   <= 1) sendYaw   = 0;
+
+
+        // 💡 計算してなめらかになった filtered〜 の値をドローン送信関数へ渡す
+        sendFlightControlData(throttleVal, filteredPitch, filteredRoll, filteredYaw);
     };
 
     if (remaining <= 0) {
